@@ -1,0 +1,32 @@
+#! /bin/sh
+
+pkill sxhkd
+sxhkd &
+
+$HOME/.config/polybar/launch.sh
+
+
+
+
+# pgrep -x sxhkd > /dev/null || sxhkd &
+
+bspc monitor eDP1 -n monitor0 -d 1 2 3 4 5
+bspc monitor HDMI1 -n monitor1 -d 6 7 8 9 10
+
+bspc config border_width        3
+bspc config window_gap          3
+
+bspc config top_padding         0
+bspc config bottom_padding      0
+
+bspc config split_ratio          0.52
+bspc config borderless_monocle   true
+bspc config gapless_monocle      true
+
+bspc rule -a Gimp desktop='^8' state=floating follow=on
+bspc rule -a firefox desktop='^2' follow=on
+bspc rule -a mplayer2 state=floating
+bspc rule -a Kupfer.py focus=on
+bspc rule -a Screenkey manage=off
+bspc rule -a Alacritty desktop='^3' follow=on
+bspc rule -a Pcmanfm desktop='^4' follow=on
