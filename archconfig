@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# System update
+sudo pacman -Syu --noconfirm
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
+sudo pacman-key --lsign-key 3056513887B78AEB
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+
+# AUR helper installation
+sudo pacman -S git base-devel python --noconfirm
+git clone https://aur.archlinux.org/yay.git
+cd yay
+makepkg -si --noconfirm
+
+sudo pacman -Syu --noconfirm
+
+# GRUB config
+sudo cp -r ./docfiles/grub /etc/default/grub
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+# Config files
+sudo cp -r ./docfiles/00-keyboard.conf /usr/share/X11/xorg.conf.d/00-keyboard.conf
+sudo ln -s /usr/share/X11/xorg.conf.d/00-keyboard.conf /etc/X11/xorg.conf.d/00-keyboard.conf
+
+sudo cp -r ./docfiles/10-evdev.conf /usr/share/X11/xorg.conf.d/10-evdev.conf
+sudo ln -s /usr/share/X11/xorg.conf.d/10-evdev.conf /etc/X11/xorg.conf.d/10-evdev.conf
+
+sudo cp -r ./docfiles/10-quirks.conf /usr/share/X11/xorg.conf.d/10-quirks.conf
+sudo ln -s /usr/share/X11/xorg.conf.d/10-quirks.conf /etc/X11/xorg.conf.d/10-quirks.conf
+
+sudo cp -r ./docfiles/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
+sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
+
+sudo cp -r ./docfiles/70-synaptics.conf /etc/X11/xorg.conf.d/70-synaptics.conf
+sudo ln -s /usr/share/X11/xorg.conf.d/70-synaptics.conf /etc/X11/xorg.conf.d/70-synaptics.conf
+
+# System reboot
+reboot
