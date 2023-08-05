@@ -15,6 +15,14 @@ makepkg -si --noconfirm
 
 sudo pacman -Syu --noconfirm
 
+# Apps Installing
+apps=("bspwm", "sxhkd", "alacritty")
+
+for i in "${apps[@]}"
+do
+    echo $i
+done
+
 # GRUB config
 sudo cp -r ./docfiles/grub /etc/default/grub
 sudo grub-mkconfig -o /boot/grub/grub.cfg
