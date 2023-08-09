@@ -1,0 +1,18 @@
+#!/bin/bash
+
+os=()
+
+centrado () {
+row=8
+col=$(( ($(tput cols) - ${#1}) /2 ))
+# tput clear
+tput cup $row $col
+echo "$1"	
+}
+
+check_root() {
+    if [[ "$(id -u)" != "0" ]]; then
+      error_msg "ERROR! Ejecute el script como usuario ROOT"
+    fi
+}
+

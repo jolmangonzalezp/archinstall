@@ -1,5 +1,24 @@
 #!/bin/bash
 
+if [[ $(pwd)/modules/global && $(pwd)/modules/menu && $(pwd)/modules/language && $(pwd)/modules/partitioning ]]; then
+  source modules/global
+#   source modules/menu
+#   source modules/language
+#   source modules/partitioning
+
+  echo $(tput initc 8 000 500 500) $(tput setaf 8)
+  echo $(tput bold)
+
+  figlet -c -t -f slant "Ianarch"
+  centrado "Telegram: @Ianeph | Github: https://github.com/jolmang"
+  sleep 5
+
+  clear
+else
+  echo "No se encuentra el archivo 'functions'"
+  exit 1
+fi
+
 # System update
 sudo pacman -Syu --noconfirm
 
@@ -42,6 +61,8 @@ sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-l
 
 sudo cp -r ./docfiles/70-synaptics.conf /etc/X11/xorg.conf.d/70-synaptics.conf
 sudo ln -s /usr/share/X11/xorg.conf.d/70-synaptics.conf /etc/X11/xorg.conf.d/70-synaptics.conf
+
+# Lightdm
 
 # System reboot
 reboot
