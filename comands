@@ -1,1 +1,6 @@
 sudo pacman -S lightdm lightdm-webkit-litarvan
+
+
+/var/lib/pacman/db.lck
+
+sudo cp -r ./CyberEXS /boot/grub/themes

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+pkg-install () {
+    if pacman -Ss $1 != 0; then
+        echo "We was founded the package in Oficials repository"
+        echo
+        echo "Do you want install $1?"
+        read answer
+        if $answer == "Si" || $answer == "si" || $answer == "Yes" || $answer == "yes" || $answer == "S" || $answer == "s" || $answer == "Y" || $answer == "y";then
+            sudo pacman -S $1
+            echo
+            echo $1 "have been installed"
+        else
+            echo $1 "have not been installed"
+        fi
+    else
+        echo "We was founded the package in AUR repository"
+        echo
+        echo "Do you want install $1?"
+        read answer
+        if $answer == "Si" || $answer == "si" || $answer == "Yes" || $answer == "yes" || $answer == "S" || $answer == "s" || $answer == "Y" || $answer == "y";then
+            yay -S $1
+            echo
+            echo $1 "have been installed"
+        else
+            echo $1 "have not been installed"
+        fi
+    fi
+}
