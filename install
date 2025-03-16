@@ -48,39 +48,14 @@ function connect_to_internet() {
     menu_continue "particion_disco"
 }
 
-function particion_disco() {
-    disks=$(lsblk -dno NAME,SIZE | awk '{print $1, $2}')
-    echo "Discos disponibles:"
-    echo "$disks"
-    read -p "Selecciona el disco a particionar: " disk_name
-    (
-        echo "g"; 
-        echo "n"; 
-        echo "1"; 
-        echo ""; 
-        echo "+512M"; 
-        echo "t"
-        echo "1"; 
-        echo "n"; 
-        echo "2"; 
-        echo ""; 
-        echo ""; 
-        echo "w";
-    ) | fdisk "/dev/$disk_name"
-    clear
-    echo "Particiones creadas:"
-    lsblk "/dev/$disk_name"
-    menu_continue "disk_formating" "$disk_name"
-}
-
 function encripting() {
 
     echo "Encriptando el disco"
     local disk_name="$1"
     shift
-    cryptsetup -y -v luksFormat /dev/$disk_name
+    read -s -p "Introduce la contraseña LUKS: " luks_pass
+    echo -e "YES\n$luks_pass" | cryptsetup -y -v luksFormat /dev/$disk_name --key-file -
     cryptsetup open /dev/$disk_name cryptroot
-    
 }
 
 function disk_formating() {
@@ -101,7 +76,32 @@ function disk_formating() {
         echo "No se pudo determinar la interfaz de $disk_name."
 fi
 
+}rticion_disco() {
+    disks=$(lsblk -dno NAME,SIZE | awk '{print $1, $2}')
+    echo "Discos disponibles:"
+    echo "$disks"
+    read -p "Selecciona el disco a particionar: " disk_name
+    (
+        echo "g"; 
+        echo "n"; 
+        echo "1"; 
+        echo ""; 
+        echo "+512M"; 
+        echo "t"
+        echo "1"; 
+ 1111111ggggggggggggggggg11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111       echo "n"; 
+        echo "2"; 
+        echo ""; 
+        echo ""; 
+        echo 11y11511117111167111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj17111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"w";
+    ) | fdisk "/dev/$disk_name"
+    clear
+    echo "Particiones creadas:"
+    lsblk "/dev/$disk_name"
+    menu_continue "disk_formating" "$disk_name"
 }
+g11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+1t11t511uio111u1r11t11f1y11r1t
 
 
 function show_main_menu() {
