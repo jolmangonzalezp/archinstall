@@ -2,6 +2,10 @@
 
 locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
 rfkill unblock 0
+rfkill unblock 1
+rfkill unblock 2
+rfkill unblock 3
+
 
 function menu_continue() {
     read -p "¿Desea continuar? (s/n): " continuar
@@ -16,11 +20,9 @@ function menu_continue() {
 
 function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
-    # echo $locale >> locale.gen && locale-gen
+    echo $locale >> locale.gen && locale-gen
     clear
     echo "El teclado y el idioma se han configurado correctamente"
-    echo "Presiona Enter para volver al menú"
-    read -r
     menu_continue "connect_to_internet"
 }
 
@@ -75,6 +77,23 @@ function particion_disco() {
     disks=$(lsblk -dno NAME,SIZE | awk '{print $1, $2}')
     echo "Discos disponibles:"
     echo "$disks"
+
+    read -p "Selecciona el disco a particionar: " disk_name
+
+    (
+        echo "g"; # Crear una tabla de particiones GPT
+        echo "n"; # Crear una nueva partición
+        echo "1"; # Número de partición
+        echo ""; # Sector de inicio (predeterminado)
+        echo "512M"; # Tamaño de la partición EFI
+        echo "n"; # Crear una nueva partición
+        echo "2"; # Número de partición
+        echo ""; # Sector de inicio (predeterminado)
+        echo ""; # Tamaño de la partición root
+        echo "w"; # Escribir los cambios y salir
+    ) | fdisk "/dev/$disk_name"
+    echo "Particiones creadas:"
+    lsblk "/dev/$disk_name"
 }
 
 # Función para instalar el sistema base
