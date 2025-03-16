@@ -44,7 +44,7 @@ function connect_to_internet() {
         read -r
         iwctl
     fi
-
+    timedatectl
     menu_continue "particion_disco"
 }
 
@@ -67,9 +67,40 @@ function particion_disco() {
         echo ""; 
         echo "w";
     ) | fdisk "/dev/$disk_name"
+    clear
     echo "Particiones creadas:"
     lsblk "/dev/$disk_name"
     menu_continue "disk_formating" "$disk_name"
+}
+
+function encripting() {
+
+    echo "Encriptando el disco"
+    local disk_name="$1"
+    shift
+    cryptsetup -y -v luksFormat /dev/$disk_name
+    cryptsetup open /dev/$disk_name cryptroot
+    
+}
+
+function disk_formating() {
+
+    local disk_name="$1"
+    shift
+    interface=$(lsblk -o NAME,TRAN | grep "^$disk_name " | awk '{print $2}')
+
+    if [[ "$interface" == "sata" ]]; then
+        mkfs.fat -F32 "/dev/${disk_name}1"
+        encripting "$disk_name"
+        # mkfs.ext4 "/dev/${disk_name}2"
+    elif [[ "$interface" == "nvme" ]]; then
+        mkfs.fat -F32 "/dev/${disk_name}p1"
+        encripting "$disk_name"
+        # mkfs.ext4 "/dev/${disk_name}p2"
+    else
+        echo "No se pudo determinar la interfaz de $disk_name."
+fi
+
 }
 
 
@@ -96,23 +127,7 @@ function show_main_menu() {
     esac
 }
 
-function disk_formating() {
 
-    local disk_name="$1"
-    shift
-    interface=$(lsblk -o NAME,TRAN | grep "^$disk_name " | awk '{print $2}')
-
-    if [[ "$interface" == "sata" ]]; then
-        echo "El disco $disk_name es un SSD SATA o HDD."
-    elif [[ "$interface" == "nvme" ]]; then
-        echo "El disco $disk_name es un SSD NVMe."
-    else
-        echo "No se pudo determinar la interfaz de $disk_name."
-fi
-
-    # mkfs.fat -F32 "/dev/${disk_name}1"
-    # mkfs.ext4 "/dev/${disk_name}2"
-}
 
 # Función para instalar el sistema base
 function instalar_sistema() {
