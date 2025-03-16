@@ -81,16 +81,18 @@ function particion_disco() {
     read -p "Selecciona el disco a particionar: " disk_name
 
     (
-        echo "g"; # Crear una tabla de particiones GPT
-        echo "n"; # Crear una nueva partición
-        echo "1"; # Número de partición
-        echo ""; # Sector de inicio (predeterminado)
-        echo "512M"; # Tamaño de la partición EFI
-        echo "n"; # Crear una nueva partición
-        echo "2"; # Número de partición
-        echo ""; # Sector de inicio (predeterminado)
-        echo ""; # Tamaño de la partición root
-        echo "w"; # Escribir los cambios y salir
+        echo "g"; 
+        echo "n"; 
+        echo "1"; 
+        echo ""; 
+        echo "+512M"; 
+        echo "t"
+        echo "1"; 
+        echo "n"; 
+        echo "2"; 
+        echo ""; 
+        echo ""; 
+        echo "w";
     ) | fdisk "/dev/$disk_name"
     echo "Particiones creadas:"
     lsblk "/dev/$disk_name"
