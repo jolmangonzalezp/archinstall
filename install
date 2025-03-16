@@ -1,0 +1,116 @@
+#!/bin/sh
+
+locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
+rfkill unblock 0
+
+function menu_continue() {
+    read -p "¿Desea continuar? (s/n): " continuar
+    if [[ $continuar != "s" && $continuar != "S" ]]; then
+        show_main_menu
+    else
+        local module="$1"
+        shift
+        "$module" "$@"
+    fi
+}
+
+function configurar_teclado_idioma() {
+    echo "Configurando el teclado y el idioma"
+    # echo $locale >> locale.gen && locale-gen
+    clear
+    echo "El teclado y el idioma se han configurado correctamente"
+    echo "Presiona Enter para volver al menú"
+    read -r
+    menu_continue "connect_to_internet"
+}
+
+function connect_to_internet() {
+    if ping -c1 8.8.8.8 &>/dev/null; then
+        echo "Conexión a Internet: OK"
+    else
+        echo "No hay conexión a Internet"
+        echo "Para conectarse a Internet, ejecuta: "
+        echo "device list"
+        echo "station wlan0 scan"
+        echo "station wlan0 get-networks"
+        echo "station wlan0 connect NOMBRE_RED"
+        echo "station wlan0 connect-hidden NOMBRE_RED | En caso de que la red sea oculta"
+        echo "y por último, exit"
+
+        sleep 5
+        echo "Presiona Enter para iniciar el proceso de conexión a Internet"
+        read -r
+        iwctl
+    fi
+    
+    # menu_continue "particionar_disco"
+    menu_continue "particion_disco"
+}
+
+function show_main_menu() {
+    clear
+    echo "===== Arch Linux Installer ====="
+    echo
+    echo "1. Particionar el disco"
+    echo "2. Instalar el sistema base"
+    echo "3. Configurar la red"
+    echo "5. Crear usuario"
+    echo "6. Configurar el sistema"
+    echo "7. Salir"
+    echo -n "Selecciona una opción: "
+    read -r option
+    case $option in
+        1) particion_disco ;;
+        2) instalar_sistema ;;
+        3) configurar_red ;;
+        4) crear_usuario ;;
+        5) configurar_sistema ;;
+        6) exit 0 ;;
+        *) echo "Opción inválida. Presiona Enter para continuar." && read -r && show_main_menu ;;
+    esac
+}
+
+# Función para particionar el disco
+function particion_disco() {
+    disks=$(lsblk -dno NAME,SIZE | awk '{print $1, $2}')
+    echo "Discos disponibles:"
+    echo "$disks"
+}
+
+# Función para instalar el sistema base
+function instalar_sistema() {
+    source "$(pwd)/modules/installation.sh"
+    instalar_sistema
+    show_main_menu
+}
+
+# Función para configurar la red
+function configurar_red() {
+    source "$(pwd)/modules/networking.sh"
+    configurar_red
+    show_main_menu
+}
+
+# Función para crear el usuario
+function crear_usuario() {
+    source "$(pwd)/modules/user.sh"
+    crear_usuario
+    show_main_menu
+}
+
+# Función para configurar el sistema
+function configurar_sistema() {
+    source "$(pwd)/modules/system.sh"
+    configurar_sistema
+    show_main_menu
+}
+
+# Función para crear un dual-boot
+function crear_dual_boot() {
+    source "$(pwd)/modules/partitioning.sh"
+    crear_dual_boot
+    show_main_menu
+}
+
+configurar_teclado_idioma
+connect_to_internet
