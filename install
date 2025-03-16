@@ -1,10 +1,10 @@
 #!/bin/sh
 
 locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
-rfkill unblock 0
-rfkill unblock 1
-rfkill unblock 2
-rfkill unblock 3
+# rfkill unblock 0
+# rfkill unblock 1
+# rfkill unblock 2
+# rfkill unblock 3
 
 
 function menu_continue() {
