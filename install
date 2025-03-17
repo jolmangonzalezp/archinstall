@@ -6,23 +6,12 @@ locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
 # rfkill unblock 2
 # rfkill unblock 3
 
-function menu_continue() {
-    read -p "¿Desea continuar? (s/n): " continuar
-    if [[ $continuar != "s" && $continuar != "S" ]]; then
-        show_main_menu
-    else
-        local module="$1"
-        shift
-        "$module" "$@"
-    fi
-}
-
 function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
     echo $locale >> locale.gen && locale-gen
     clear
     echo "El teclado y el idioma se han configurado correctamente"
-    menu_continue "connect_to_internet"
+    connect_to_internet
 }
 
 function connect_to_internet() {
@@ -44,7 +33,7 @@ function connect_to_internet() {
         iwctl
     fi
     timedatectl
-    menu_continue "particion_disco"
+    particion_disco
 }
 
 function particion_disco() {
@@ -69,7 +58,7 @@ function particion_disco() {
     clear
     echo "Particiones creadas:"
     lsblk "/dev/$disk_name"
-    menu_continue "disk_formating" "$disk_name"
+    disk_formating "$disk_name"
 }
 
 function disk_formating() {
@@ -93,15 +82,33 @@ fi
 }
 
 function encripting() {
+    set -e  # Detener la ejecución si ocurre un error
 
     echo "Encriptando el disco"
     local disk_name="$1"
-    shift
+
+    if [[ -z "$disk_name" ]]; then
+        echo "Error: No se ha especificado un disco."
+        return 1
+    fi
+
     read -s -p "Introduce la contraseña LUKS: " luks_pass
-    echo -e "YES\n$luks_pass" | cryptsetup -y -v luksFormat /dev/$disk_name --key-file -
-    cryptsetup open /dev/$disk_name cryptroot
-    menu_continue "btrfs_partition" "/dev/mapper/cryptroot"
+    echo
+    read -s -p "Confirma la contraseña LUKS: " luks_pass_confirm
+    echo
+
+    if [[ "$luks_pass" != "$luks_pass_confirm" ]]; then
+        echo "Error: Las contraseñas no coinciden."
+        return 1
+    fi
+
+    echo "Confirmando y encriptando el disco..."
+    echo -n "$luks_pass" | cryptsetup -y -v luksFormat /dev/"$disk_name" --key-file -
+
+    cryptsetup open /dev/"$disk_name" cryptroot
+    btrfs_partition "/dev/mapper/cryptroot"
 }
+
 
 function btrfs_partition() {
 
