@@ -109,15 +109,46 @@ function encripting() {
     btrfs_partition "/dev/mapper/cryptroot"
 }
 
-
 function btrfs_partition() {
 
     echo "Formating btrfs"
     local disk_name="$1"
     shift
-    
+    mkfs.btrfs /dev/mapper/cryptroot
+    mount $disk_name /mnt
+    cd /mnt
+    btrfs subvolume create @
+    btrfs subvolume create @home
+    btrfs subvolume create @snapshots
+    btrfs subvolume create @var_log
+    btrfs subvolume create @swap
+    cd
+    mount_partitions
 }
 
+function mount_partitions() {
+    umount /mnt
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ /dev/mapper/cryptroot /mnt
+    mkdir -p /mnt/{boot,home,.snapshots,var/log,swap}
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home /dev/mapper/cryptroot /mnt/home
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
+    mount -o noatime,subvol=@swap /dev/mapper/cryptroot /mnt/swap
+    mount /dev/nvme0n1p1 /mnt/boot
+    cd /mnt/swap
+    btrfs filesystem mkswapfile --size 4g --uuid clear ./swapfile
+    swapon ./swapfile
+    cd
+    instalar_sistema
+}
+
+function instalar_sistema() {
+    intel-ucode
+    pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch
+
+    genfstab -U /mnt >> /mnt/etc/fstab
+}
+    
 function show_main_menu() {
     clear
     echo "===== Arch Linux Installer ====="
@@ -141,14 +172,6 @@ function show_main_menu() {
     esac
 }
 
-
-
-# Función para instalar el sistema base
-function instalar_sistema() {
-    source "$(pwd)/modules/installation.sh"
-    instalar_sistema
-    show_main_menu
-}
 
 # Función para configurar la red
 function configurar_red() {
