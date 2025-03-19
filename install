@@ -8,7 +8,7 @@ locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
 
 function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
-    echo $locale >> locale.gen && locale-gen
+    echo $locale".UTF-8" >> /etc/locale.gen && locale-gen
     clear
     echo "El teclado y el idioma se han configurado correctamente"
     connect_to_internet
@@ -32,7 +32,7 @@ function connect_to_internet() {
         read -r
         iwctl
     fi
-    timedatectl
+    timedatectl set-ntp true
     particion_disco
 }
 
@@ -77,6 +77,7 @@ function disk_formating() {
         # mkfs.ext4 "/dev/${disk_name}p2"
     else
         echo "No se pudo determinar la interfaz de $disk_name."
+
 fi
 
 }
@@ -123,10 +124,12 @@ function btrfs_partition() {
     btrfs subvolume create @var_log
     btrfs subvolume create @swap
     cd
-    mount_partitions
+    mount_partitions "$disk_name"
 }
 
 function mount_partitions() {
+    local disk_name="$1"
+    shift
     umount /mnt
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@ /dev/mapper/cryptroot /mnt
     mkdir -p /mnt/{boot,home,.snapshots,var/log,swap}
@@ -135,6 +138,7 @@ function mount_partitions() {
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
     mount -o noatime,subvol=@swap /dev/mapper/cryptroot /mnt/swap
     mount /dev/nvme0n1p1 /mnt/boot
+
     cd /mnt/swap
     btrfs filesystem mkswapfile --size 4g --uuid clear ./swapfile
     swapon ./swapfile
@@ -143,10 +147,14 @@ function mount_partitions() {
 }
 
 function instalar_sistema() {
-    intel-ucode
-    pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch
 
-    genfstab -U /mnt >> /mnt/etc/fstab
+    cpu_brand=$(lscpu | grep "Model name" | awk '{print $3}')
+    if [[ $cpu_brand == "AMD" ]]; then
+        pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch amd-ucode
+    else
+        pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch intel-ucode
+    fi
+   genfstab -U /mnt >> /mnt/etc/fstab
 }
     
 function show_main_menu() {
@@ -172,34 +180,6 @@ function show_main_menu() {
     esac
 }
 
-
-# Función para configurar la red
-function configurar_red() {
-    source "$(pwd)/modules/networking.sh"
-    configurar_red
-    show_main_menu
-}
-
-# Función para crear el usuario
-function crear_usuario() {
-    source "$(pwd)/modules/user.sh"
-    crear_usuario
-    show_main_menu
-}
-
-# Función para configurar el sistema
-function configurar_sistema() {
-    source "$(pwd)/modules/system.sh"
-    configurar_sistema
-    show_main_menu
-}
-
-# Función para crear un dual-boot
-function crear_dual_boot() {
-    source "$(pwd)/modules/partitioning.sh"
-    crear_dual_boot
-    show_main_menu
-}
 
 configurar_teclado_idioma
 connect_to_internet
