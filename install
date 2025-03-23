@@ -120,8 +120,7 @@ function encripting() {
         return 1
     fi
     echo "Confirmando y encriptando el disco..."
-    sudo dd if=/dev/zero of=/dev/"$root_partition" bs=1M status=progress
-
+    cryptsetup erase $root_partition
     echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 --force_password /dev/"$root_partition" --key-file -
     cryptsetup open /dev/"$root_partition" cryptroot 
     btrfs_partition 
