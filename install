@@ -1,13 +1,12 @@
 #!/bin/sh
 
 efi=""
+root_partition="/dev/mapper/cryptroot"
+crypy_root=""
 locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
 timezone=$(curl -s https://ipapi.co/timezone | tr ',' '\n' | head -n 1)
 hostname=$(hostnamectl | grep "Hardware Model" | awk -F': ' '{gsub(/ /, "_", $2); print $2}')
-# rfkill unblock 0
-# rfkill unblock 1
-# rfkill unblock 2
-# rfkill unblock 3
+
 function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
     # echo $locale".UTF-8 UTF-8" >> /etc/locale.gen && locale-gen
@@ -28,7 +27,6 @@ function rfkill_unblock() {
                 rfkill unblock "$id"
                 echo "Desbloqueado a nivel de software."
             fi
-            
             if [ "$hard_blockd" == "yes" ]; then
                 echo "El dispositivo con ID $id está bloqueado a nivel de hardware. No se puede desbloquear automáticamente."
             fi
@@ -50,8 +48,7 @@ function connect_to_internet() {
         echo "station wlan0 get-networks"
         echo "station wlan0 connect NOMBRE_RED"
         echo "station wlan0 connect-hidden NOMBRE_RED | En caso de que la red sea oculta"
-        echo "y por último, exit"
-        
+        echo "y por último, exit" 
         sleep 5
         echo "Presiona Enter para iniciar el proceso de conexión a Internet"
         read -r
@@ -87,62 +84,53 @@ function particion_disco() {
 }
 
 function disk_formating() {
-    
     local disk_name="$1"
     shift
     interface=$(lsblk -o NAME,TRAN | grep "^$disk_name " | awk '{print $2}')
     
     if [[ "$interface" == "sata" ]]; then
         efi="${disk_name}1"
+        root_partition="${disk_name}2"
         mkfs.fat -F32 "/dev/${efi}"
-        encripting "${disk_name}2"
+        encripting "$root_partition"
     elif [[ "$interface" == "nvme" ]]; then
         efi="${disk_name}p1"
+        root_partition="${disk_name}p2"
         mkfs.fat -F32 "/dev/${efi}"
-        encripting "${disk_name}p2"
+        encripting
     else
-        echo "No se pudo determinar la interfaz de $disk_name."
-        
+        echo "No se pudo determinar la interfaz de $disk_name."   
     fi
-    
 }
 
 function encripting() {
     set -e  # Detener la ejecución si ocurre un error
-    
     echo "Encriptando el disco"
     local disk_name="$1"
-    
     if [[ -z "$disk_name" ]]; then
         echo "Error: No se ha especificado un disco."
         return 1
     fi
-    
     read -s -p "Introduce la contraseña LUKS: " luks_pass
     echo
     read -s -p "Confirma la contraseña LUKS: " luks_pass_confirm
     echo
-    
     if [[ "$luks_pass" != "$luks_pass_confirm" ]]; then
         echo "Error: Las contraseñas no coinciden."
         return 1
     fi
-    
     echo "Confirmando y encriptando el disco..."
-    sudo dd if=/dev/zero of=/dev/sda2 bs=1M status=progress
+    sudo dd if=/dev/zero of=/dev/"$root_partition" bs=1M status=progress
 
-    echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 /dev/"$disk_name" --key-file -
-    cryptsetup open /dev/"$disk_name" cryptroot
-    btrfs_partition "/dev/mapper/cryptroot"
+    echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 --force_password /dev/"$root_partition" --key-file -
+    cryptsetup open /dev/"$root_partition" cryptroot 
+    btrfs_partition 
 }
 
 function btrfs_partition() {
-    
     echo "Formating btrfs"
-    local disk_name="$1"
-    shift
-    mkfs.btrfs /dev/mapper/cryptroot
-    mount $disk_name /mnt
+    mkfs.btrfs $crypy_root
+    mount $crypy_root /mnt
     cd /mnt
     btrfs subvolume create @
     btrfs subvolume create @home
@@ -150,52 +138,39 @@ function btrfs_partition() {
     btrfs subvolume create @var_log
     btrfs subvolume create @swap
     cd
-    mount_partitions "$disk_name"
+    mount_partitions
 }
 
 function mount_partitions() {
-    local disk_name="$1"
-    shift
-    umount /mnt
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ /dev/mapper/cryptroot /mnt
+    umount /mnt 
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ $crypy_root /mnt
     mkdir -p /mnt/{boot,home,.snapshots,var/log,swap}
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home /dev/mapper/cryptroot /mnt/home
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
-    mount -o noatime,subvol=@swap /dev/mapper/cryptroot /mnt/swap
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home $crypy_root /mnt/home
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots $crypy_root /mnt/.snapshots
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log $crypy_root /mnt/var/log
+    mount -o noatime,subvol=@swap $crypy_root /mnt/swap
     mount /dev/${efi} /mnt/boot
     swap
 }
 
 function swap () {
-   
+    swap_size=""
     size=$(awk '/MemTotal/ {print $2/1048576}' /proc/meminfo)
-    if [ $size -lt 1 ]; then
-        echo "El tamaño de la memoria de intercambio es demasiado pequeño. Se recomienda un tamaño de al menos 1024 MB."
-        read -p "¿Desea continuar con el tamaño actual? (S/N): " continue_swap
-        if [ "$continue_swap" == "S" ] || [ "$continue_swap" == "s" ]; then
-            echo "Continuando con el tamaño actual."
-        else
-            echo "Cancelando la instalación."
-            exit 1
-        fi
+    if [ $size -gt 8 ]; then
+        swap_size=$size/2
+    elif [ $size -le 8 && $size -gt 2 ]; then
+        swap_size=$size
     else
-        echo "El tamaño de la memoria de intercambio es adecuado."
-        read -p "¿Desea continuar con el tamaño actual? (S/N): " continue_swap
-        if [ "$continue_swap" == "N" ] || [ "$continue_swap" == "n" ]; then
-            echo "Cancelando la instalación."
-            exit 1
-        fi
+        swap_size=$size*2
     fi
     cd /mnt/swap
-    btrfs filesystem mkswapfile --size $size --uuid clear ./swapfile
+    btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
     swapon ./swapfile
     cd
     instalar_sistema
 }
 
-function instalar_sistema() {
-    
+function instalar_sistema() {  
     cpu_brand=$(lscpu | grep "Model name" | awk '{print $3}')
     if [[ $cpu_brand == "AMD" ]]; then
         pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch amd-ucode
