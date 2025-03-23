@@ -162,10 +162,10 @@ function mount_partitions() {
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
     mount -o noatime,subvol=@swap /dev/mapper/cryptroot /mnt/swap
-    mount /dev/nvme0n1p1 /mnt/boot
+    mount /dev/${efi} /mnt/boot
     
     cd /mnt/swap
-    btrfs filesystem mkswapfile --size 4g --uuid clear ./swapfile
+    btrfs filesystem mkswapfile --size 1g --uuid clear ./swapfile
     swapon ./swapfile
     cd
     instalar_sistema
