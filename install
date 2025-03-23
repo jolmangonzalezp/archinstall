@@ -48,7 +48,7 @@ function connect_to_internet() {
         echo "station wlan0 get-networks"
         echo "station wlan0 connect NOMBRE_RED"
         echo "station wlan0 connect-hidden NOMBRE_RED | En caso de que la red sea oculta"
-        echo "y por último, exit" 
+        echo "y por último, exit"
         sleep 5
         echo "Presiona Enter para iniciar el proceso de conexión a Internet"
         read -r
@@ -93,24 +93,33 @@ function disk_formating() {
         root_partition="${disk_name}2"
         mkfs.fat -F32 "/dev/${efi}"
         encripting "$root_partition"
-    elif [[ "$interface" == "nvme" ]]; then
+        elif [[ "$interface" == "nvme" ]]; then
         efi="${disk_name}p1"
         root_partition="${disk_name}p2"
         mkfs.fat -F32 "/dev/${efi}"
         encripting
     else
-        echo "No se pudo determinar la interfaz de $disk_name."   
+        echo "No se pudo determinar la interfaz de $disk_name."
     fi
 }
 
 function encripting() {
     set -e  # Detener la ejecución si ocurre un error
     echo "Encriptando el disco"
-    local disk_name="$1"
-    if [[ -z "$disk_name" ]]; then
-        echo "Error: No se ha especificado un disco."
+
+    # Verificar que root_partition esté definido globalmente
+    if [[ -z "$root_partition" ]]; then
+        echo "Error: La variable global root_partition no está definida."
         return 1
     fi
+
+    # Verificar si la partición existe
+    if [[ ! -e /dev/"$root_partition" ]]; then
+        echo "Error: El dispositivo /dev/$root_partition no existe."
+        return 1
+    fi
+
+    # Solicitar contraseña LUKS
     read -s -p "Introduce la contraseña LUKS: " luks_pass
     echo
     read -s -p "Confirma la contraseña LUKS: " luks_pass_confirm
@@ -119,18 +128,33 @@ function encripting() {
         echo "Error: Las contraseñas no coinciden."
         return 1
     fi
-    echo "Confirmando y encriptando el disco..."
-    if [[ -e /dev/"$root_partition" ]]; then
-        if mount | grep -q "/dev/$root_partition"; then
-        sudo umount /dev/"$root_partition"
+
+    # Verificar si la partición está montada y desmontarla si es necesario
+    if mount | grep -q "/dev/$root_partition"; then
+        echo "El dispositivo /dev/$root_partition está montado. Desmontando..."
+        umount "/dev/$root_partition"
     fi
-        cryptsetup erase $root_partition
-        # ls /dev/"$root_partition" >/dev/null 2>&1
+
+    # Limpiar la partición si ya tiene datos o configuraciones previas
+    echo "Limpiando el disco..."
+    cryptsetup erase "/dev/$root_partition" || echo "Advertencia: No se pudo limpiar el disco. Verifica permisos."
+
+    # Formatear y abrir la partición con LUKS
+    echo "Configurando LUKS en el disco..."
+    echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 --force-password /dev/"$root_partition" --key-file -
+    cryptsetup open /dev/"$root_partition" cryptroot
+
+    # Verificar si crypy_root está definido globalmente
+    if [[ -n "$crypy_root" ]]; then
+        echo "Se usará la carpeta $crypy_root para montar la partición."
+    else
+        echo "Advertencia: La variable crypy_root no está definida globalmente. Continuando sin montar."
     fi
-    echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 --force_password /dev/"$root_partition" --key-file -
-    cryptsetup open /dev/"$root_partition" cryptroot 
-    btrfs_partition 
+    btrfs_partition
+
+    echo "Encriptación completada exitosamente."
 }
+
 
 function btrfs_partition() {
     echo "Formating btrfs"
@@ -147,7 +171,7 @@ function btrfs_partition() {
 }
 
 function mount_partitions() {
-    umount /mnt 
+    umount /mnt
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@ $crypy_root /mnt
     mkdir -p /mnt/{boot,home,.snapshots,var/log,swap}
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@home $crypy_root /mnt/home
@@ -163,7 +187,7 @@ function swap () {
     size=$(awk '/MemTotal/ {print $2/1048576}' /proc/meminfo)
     if [ $size -gt 8 ]; then
         swap_size=$size/2
-    elif [ $size -le 8 && $size -gt 2 ]; then
+        elif [ $size -le 8 && $size -gt 2 ]; then
         swap_size=$size
     else
         swap_size=$size*2
@@ -175,7 +199,7 @@ function swap () {
     instalar_sistema
 }
 
-function instalar_sistema() {  
+function instalar_sistema() {
     cpu_brand=$(lscpu | grep "Model name" | awk '{print $3}')
     if [[ $cpu_brand == "AMD" ]]; then
         pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch amd-ucode
@@ -223,7 +247,7 @@ function root_password() {
 function grub () {
     sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
     sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
-# HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)
+    # HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)
 }
 
 # function show_main_menu() {
