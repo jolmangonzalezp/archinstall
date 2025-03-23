@@ -95,11 +95,11 @@ function disk_formating() {
     if [[ "$interface" == "sata" ]]; then
         efi="${disk_name}1"
         mkfs.fat -F32 "/dev/${efi}"
-        encripting "$disk_name"
-        elif [[ "$interface" == "nvme" ]]; then
+        encripting "${disk_name]2"
+    elif [[ "$interface" == "nvme" ]]; then
         efi="${disk_name}p1"
         mkfs.fat -F32 "/dev/${efi}"
-        encripting "$disk_name"
+        encripting "${disk_name}p2"
     else
         echo "No se pudo determinar la interfaz de $disk_name."
         
@@ -129,8 +129,7 @@ function encripting() {
     fi
     
     echo "Confirmando y encriptando el disco..."
-    echo -n "$luks_pass" | cryptsetup -y -v luksFormat /dev/"$disk_name" --key-file -
-    
+    echo -n "$luks_pass" | cryptsetup -y -v luksFormat --force /dev/"$disk_name" --key-file -
     cryptsetup open /dev/"$disk_name" cryptroot
     btrfs_partition "/dev/mapper/cryptroot"
 }
@@ -164,8 +163,30 @@ function mount_partitions() {
     mount -o noatime,subvol=@swap /dev/mapper/cryptroot /mnt/swap
     mount /dev/${efi} /mnt/boot
     
+}
+
+function swap () {
+   
+    size=$(awk '/MemTotal/ {print $2/1048576}' /proc/meminfo)
+    if [ $size -lt 1.0 ]; then
+        echo "El tamaño de la memoria de intercambio es demasiado pequeño. Se recomienda un tamaño de al menos 1024 MB."
+        read -p "¿Desea continuar con el tamaño actual? (S/N): " continue_swap
+        if [ "$continue_swap" == "S" ] || [ "$continue_swap" == "s" ]; then
+            echo "Continuando con el tamaño actual."
+        else
+            echo "Cancelando la instalación."
+            exit 1
+        fi
+    else
+        echo "El tamaño de la memoria de intercambio es adecuado."
+        read -p "¿Desea continuar con el tamaño actual? (S/N): " continue_swap
+        if [ "$continue_swap" == "N" ] || [ "$continue_swap" == "n" ]; then
+            echo "Cancelando la instalación."
+            exit 1
+        fi
+    fi
     cd /mnt/swap
-    btrfs filesystem mkswapfile --size 1g --uuid clear ./swapfile
+    btrfs filesystem mkswapfile --size $size --uuid clear ./swapfile
     swapon ./swapfile
     cd
     instalar_sistema
