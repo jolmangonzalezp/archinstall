@@ -120,7 +120,7 @@ function encripting() {
         return 1
     fi
     echo "Confirmando y encriptando el disco..."
-    if [[ ls /dev/"$root_partition" ]]; then
+    if [[ -e /dev/"$root_partition" ]]; then
         cryptsetup erase $root_partition
     fi
     echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 --force_password /dev/"$root_partition" --key-file -
