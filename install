@@ -121,7 +121,11 @@ function encripting() {
     fi
     echo "Confirmando y encriptando el disco..."
     if [[ -e /dev/"$root_partition" ]]; then
+        if mount | grep -q "/dev/$root_partition"; then
+        sudo umount /dev/"$root_partition"
+    fi
         cryptsetup erase $root_partition
+        # ls /dev/"$root_partition" >/dev/null 2>&1
     fi
     echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 --force_password /dev/"$root_partition" --key-file -
     cryptsetup open /dev/"$root_partition" cryptroot 
