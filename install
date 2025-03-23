@@ -14,7 +14,7 @@ function configurar_teclado_idioma() {
     sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && locale-gen
     clear
     echo "El teclado y el idioma se han configurado correctamente"
-    connect_to_internet
+    rfkill_unblock
 }
 
 function rfkill_unblock() {
@@ -36,6 +36,7 @@ function rfkill_unblock() {
             echo "No se detectó un dispositivo con ID válido."
         fi
     done
+    connect_to_internet
 }
 
 function connect_to_internet() {
@@ -246,5 +247,5 @@ function show_main_menu() {
 }
 
 
-# configurar_teclado_idioma
+configurar_teclado_idioma
 # connect_to_internet
