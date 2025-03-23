@@ -162,7 +162,7 @@ function mount_partitions() {
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
     mount -o noatime,subvol=@swap /dev/mapper/cryptroot /mnt/swap
     mount /dev/${efi} /mnt/boot
-    
+    swap
 }
 
 function swap () {
@@ -241,31 +241,31 @@ function root_password() {
 function grub () {
     sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
     sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
-HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)
+# HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)
 }
 
-function show_main_menu() {
-    clear
-    echo "===== Arch Linux Installer ====="
-    echo
-    echo "1. Particionar el disco"
-    echo "2. Instalar el sistema base"
-    echo "3. Configurar la red"
-    echo "5. Crear usuario"
-    echo "6. Configurar el sistema"
-    echo "7. Salir"
-    echo -n "Selecciona una opción: "
-    read -r option
-    case $option in
-        1) particion_disco ;;
-        2) instalar_sistema ;;
-        3) configurar_red ;;
-        4) crear_usuario ;;
-        5) configurar_sistema ;;
-        6) exit 0 ;;
-        *) echo "Opción inválida. Presiona Enter para continuar." && read -r && show_main_menu ;;
-    esac
-}
+# function show_main_menu() {
+#     clear
+#     echo "===== Arch Linux Installer ====="
+#     echo
+#     echo "1. Particionar el disco"
+#     echo "2. Instalar el sistema base"
+#     echo "3. Configurar la red"
+#     echo "5. Crear usuario"
+#     echo "6. Configurar el sistema"
+#     echo "7. Salir"
+#     echo -n "Selecciona una opción: "
+#     read -r option
+#     case $option in
+#         1) particion_disco ;;
+#         2) instalar_sistema ;;
+#         3) configurar_red ;;
+#         4) crear_usuario ;;
+#         5) configurar_sistema ;;
+#         6) exit 0 ;;
+#         *) echo "Opción inválida. Presiona Enter para continuar." && read -r && show_main_menu ;;
+#     esac
+# }
 
 
 configurar_teclado_idioma
