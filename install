@@ -129,7 +129,9 @@ function encripting() {
     fi
     
     echo "Confirmando y encriptando el disco..."
-    echo -n "$luks_pass" | cryptsetup -y -v luksFormat /dev/"$disk_name" --key-file -
+    sudo dd if=/dev/zero of=/dev/sda2 bs=1M status=progress
+
+    echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 /dev/"$disk_name" --key-file -
     cryptsetup open /dev/"$disk_name" cryptroot
     btrfs_partition "/dev/mapper/cryptroot"
 }
@@ -168,7 +170,7 @@ function mount_partitions() {
 function swap () {
    
     size=$(awk '/MemTotal/ {print $2/1048576}' /proc/meminfo)
-    if [ $size -lt 1.0 ]; then
+    if [ $size -lt 1 ]; then
         echo "El tamaño de la memoria de intercambio es demasiado pequeño. Se recomienda un tamaño de al menos 1024 MB."
         read -p "¿Desea continuar con el tamaño actual? (S/N): " continue_swap
         if [ "$continue_swap" == "S" ] || [ "$continue_swap" == "s" ]; then
