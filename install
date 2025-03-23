@@ -95,7 +95,7 @@ function disk_formating() {
     if [[ "$interface" == "sata" ]]; then
         efi="${disk_name}1"
         mkfs.fat -F32 "/dev/${efi}"
-        encripting "${disk_name]2"
+        encripting "${disk_name}2"
     elif [[ "$interface" == "nvme" ]]; then
         efi="${disk_name}p1"
         mkfs.fat -F32 "/dev/${efi}"
