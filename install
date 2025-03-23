@@ -1,17 +1,40 @@
 #!/bin/sh
 
 locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
+timezone=$(curl -s https://ipapi.co/timezone | tr ',' '\n' | head -n 1)
+hostname=$(hostnamectl | grep "Hardware Model" | awk -F': ' '{gsub(/ /, "_", $2); print $2}')
 # rfkill unblock 0
 # rfkill unblock 1
 # rfkill unblock 2
 # rfkill unblock 3
-
 function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
-    echo $locale".UTF-8" >> /etc/locale.gen && locale-gen
+    # echo $locale".UTF-8 UTF-8" >> /etc/locale.gen && locale-gen
+    sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && locale-gen
     clear
     echo "El teclado y el idioma se han configurado correctamente"
     connect_to_internet
+}
+
+function rfkill_unblock() {
+    rfkill_devices=$(rfkill list | grep -E "^[0-9]+:" | awk -F: '{print $1}')
+    for ((id = 0; id < rfkill_devices; i++)); do
+        if [ -n "$i" ]; then
+            soft_blockd=$(rfkill list $id | grep "Soft blocked" | awk '{print $3}')
+            hard_blockd=$(rfkill list $id | grep "Hard blocked" | awk '{print $3}')
+            
+            if [ "$soft_blockd" == "yes" ]; then
+                rfkill unblock "$id"
+                echo "Desbloqueado a nivel de software."
+            fi
+            
+            if [ "$hard_blockd" == "yes" ]; then
+                echo "El dispositivo con ID $id está bloqueado a nivel de hardware. No se puede desbloquear automáticamente."
+            fi
+        else
+            echo "No se detectó un dispositivo con ID válido."
+        fi
+    done
 }
 
 function connect_to_internet() {
@@ -26,7 +49,7 @@ function connect_to_internet() {
         echo "station wlan0 connect NOMBRE_RED"
         echo "station wlan0 connect-hidden NOMBRE_RED | En caso de que la red sea oculta"
         echo "y por último, exit"
-
+        
         sleep 5
         echo "Presiona Enter para iniciar el proceso de conexión a Internet"
         read -r
@@ -42,17 +65,17 @@ function particion_disco() {
     echo "$disks"
     read -p "Selecciona el disco a particionar: " disk_name
     (
-        echo "g"; 
-        echo "n"; 
-        echo "1"; 
-        echo ""; 
-        echo "+512M"; 
+        echo "g";
+        echo "n";
+        echo "1";
+        echo "";
+        echo "+512M";
         echo "t"
-        echo "1"; 
-        echo "n"; 
-        echo "2"; 
-        echo ""; 
-        echo ""; 
+        echo "1";
+        echo "n";
+        echo "2";
+        echo "";
+        echo "";
         echo "w";
     ) | fdisk "/dev/$disk_name"
     clear
@@ -62,56 +85,56 @@ function particion_disco() {
 }
 
 function disk_formating() {
-
+    
     local disk_name="$1"
     shift
     interface=$(lsblk -o NAME,TRAN | grep "^$disk_name " | awk '{print $2}')
-
+    
     if [[ "$interface" == "sata" ]]; then
         mkfs.fat -F32 "/dev/${disk_name}1"
         encripting "$disk_name"
         # mkfs.ext4 "/dev/${disk_name}2"
-    elif [[ "$interface" == "nvme" ]]; then
+        elif [[ "$interface" == "nvme" ]]; then
         mkfs.fat -F32 "/dev/${disk_name}p1"
         encripting "$disk_name"
         # mkfs.ext4 "/dev/${disk_name}p2"
     else
         echo "No se pudo determinar la interfaz de $disk_name."
-
-fi
-
+        
+    fi
+    
 }
 
 function encripting() {
     set -e  # Detener la ejecución si ocurre un error
-
+    
     echo "Encriptando el disco"
     local disk_name="$1"
-
+    
     if [[ -z "$disk_name" ]]; then
         echo "Error: No se ha especificado un disco."
         return 1
     fi
-
+    
     read -s -p "Introduce la contraseña LUKS: " luks_pass
     echo
     read -s -p "Confirma la contraseña LUKS: " luks_pass_confirm
     echo
-
+    
     if [[ "$luks_pass" != "$luks_pass_confirm" ]]; then
         echo "Error: Las contraseñas no coinciden."
         return 1
     fi
-
+    
     echo "Confirmando y encriptando el disco..."
     echo -n "$luks_pass" | cryptsetup -y -v luksFormat /dev/"$disk_name" --key-file -
-
+    
     cryptsetup open /dev/"$disk_name" cryptroot
     btrfs_partition "/dev/mapper/cryptroot"
 }
 
 function btrfs_partition() {
-
+    
     echo "Formating btrfs"
     local disk_name="$1"
     shift
@@ -138,7 +161,7 @@ function mount_partitions() {
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
     mount -o noatime,subvol=@swap /dev/mapper/cryptroot /mnt/swap
     mount /dev/nvme0n1p1 /mnt/boot
-
+    
     cd /mnt/swap
     btrfs filesystem mkswapfile --size 4g --uuid clear ./swapfile
     swapon ./swapfile
@@ -147,16 +170,57 @@ function mount_partitions() {
 }
 
 function instalar_sistema() {
-
+    
     cpu_brand=$(lscpu | grep "Model name" | awk '{print $3}')
     if [[ $cpu_brand == "AMD" ]]; then
         pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch amd-ucode
     else
         pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch intel-ucode
     fi
-   genfstab -U /mnt >> /mnt/etc/fstab
+    genfstab -U /mnt >> /mnt/etc/fstab
+    configure_new_system
 }
-    
+
+function configure_new_system() {
+    clear
+    echo "Configurando el sistema"
+    ln -sf /usr/share/zoneinfo/$timezone /mnt/etc/localtime
+    hwclock --systohc --utc
+    # echo $locale".UTF-8 UTF-8" >> /mnt/etc/locale.gen
+    sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && locale-gen
+    echo $hostname  >> /mnt/etc/hostname
+    echo "127.0.0.1    localhost" >> /mnt/etc/hosts
+    echo "::1          localhost" >> /mnt/etc/hosts
+    echo "127.0.0.1    $hostname.localdomain $hostname" >> /mnt/etc/hosts
+    root_password
+}
+
+function root_password() {
+    while true; do
+        echo "Introduce la nueva contraseña para el usuario root:"
+        read -s passwd
+        echo "Confirma la contraseña:"
+        read -s passwd_confirm
+        if [ "$passwd" == "$passwd_confirm" ]; then
+            echo -e "${passwd}\n${passwd}" | passwd
+            if [ $? -eq 0 ]; then
+                echo "La contraseña de root ha sido configurada correctamente."
+                break
+            else
+                echo "Hubo un error al configurar la contraseña de root. Inténtalo nuevamente."
+            fi
+        else
+            echo "Error: Las contraseñas no coinciden. Intenta de nuevo."
+        fi
+    done
+}
+
+function grub () {
+    sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
+    sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
+HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)
+}
+
 function show_main_menu() {
     clear
     echo "===== Arch Linux Installer ====="
@@ -181,5 +245,5 @@ function show_main_menu() {
 }
 
 
-configurar_teclado_idioma
-connect_to_internet
+# configurar_teclado_idioma
+# connect_to_internet
