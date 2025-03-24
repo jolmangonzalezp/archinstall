@@ -70,7 +70,7 @@ def get_ipapi_data(stdscr):
         if response.status_code == 200:
             data = response.json()
             locale = data.get("languages")
-            message(stdscr, f"Idioma: {locale}, Zona horaria: {timezone}")
+            message(stdscr, f"Idioma: {locale}")
             return locale
         else:
             message(stdscr, f"Error: Código de estado {response.status_code}")
