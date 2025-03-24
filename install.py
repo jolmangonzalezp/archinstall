@@ -151,6 +151,7 @@ def disk_partitioning(stdscr):
     message(stdscr ,f"Discos disponibles: \n{disks_output}")
     stdscr.addstr(10, 3, "Selecciona el disco a particionar: ", curses.color_pair(1))
     stdscr.refresh()
+    curses.curs_set(1)
     disk_name = stdscr.getstr(12, 3, 7).decode("utf-8")
     commands = [
         "g", "n", "1", "", "+512M", "t", "1", "n", "2", "", "", "w"
