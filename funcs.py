@@ -99,9 +99,9 @@ def disk_formating(disk_name):
         return
     
     subprocess.run(["mkfs.fat", "-F32", f"/dev/{efi}"], check=True)
-    encripting(root_partition)
+    
 
-def encripting(root_partition):
+def encripting():
     print("Encriptando el disco...")
     luks_pass = input("Introduce la contraseña LUKS: ")
     luks_pass_confirm = input("Confirma la contraseña LUKS: ")
@@ -116,7 +116,6 @@ def encripting(root_partition):
         input=luks_pass, text=True, check=True
     )
     subprocess.run(["cryptsetup", "open", f"/dev/{root_partition}", "cryptroot"], check=True)
-    btrfs_partition()
 
 def btrfs_partition():
     print("Formateando con BTRFS...")
