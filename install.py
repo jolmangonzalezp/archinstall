@@ -17,7 +17,7 @@ def main(stdscr):
     stdscr.clear()
     stdscr.refresh()    
 
-    menu = ['Locale', 'Disk Partition', 'Salir']
+    menu = ['Locale', 'Disk Partition', 'Formatear', 'Encriptar', 'Salir']
     current_row = 0
     
     while True:
@@ -139,7 +139,6 @@ def connect_to_internet(stdscr):
     except subprocess.CalledProcessError:
         message(stdscr, "No hay conexión a Internet. Sigue las instrucciones para conectarte manualmente usando 'iwctl'.\n'device list'\n'station wlan0 scan'\n'station wlan0 get-networks'\n'station wlan0 connect NOMBRE_RED'\n'station wlan0 connect-hidden NOMBRE_RED | En caso de que la red sea oculta'\n\n y por último, exit\n\nPresiona Enter para iniciar el proceso de conexión a Internet.")
         subprocess.run(["iwctl"], check=True)
-    
     subprocess.run(["timedatectl", "set-ntp", "true"], check=True)
 
 ################################################################################
@@ -152,9 +151,13 @@ def disk_partitioning(stdscr):
     stdscr.addstr(10, 3, "Selecciona el disco a particionar: ", curses.color_pair(1))
     curses.curs_set(1)
     stdscr.refresh()
+    global disk_name
+    ## I have to validate the disk name
     disk_name = stdscr.getstr(12, 3, 7).decode("utf-8")
     stdscr.addstr(13, 3, f"Has escrito: {disk_name}")
     stdscr.refresh()
+    ##
+    message(stdscr, "")
     stdscr.getch()
     commands = [
         "g", "n", "1", "", "+512M", "t", "1", "n", "2", "", "", "w"
@@ -164,4 +167,52 @@ def disk_partitioning(stdscr):
     stdscr.addstr(10, 3, "Particiones creadas:", curses.color_pair(1))
     subprocess.run(["lsblk", f"/dev/{disk_name}"], check=True)
 
+################################################################################
+################################## Formatting ##################################
+################################################################################
+
+def format_disk(stdscr):
+    global efi, root_partition
+    interface = subprocess.run(
+        ["lsblk", "-o", "NAME,TRAN"], capture_output=True, text=True
+    ).stdout.splitlines() 
+    if "sata" in interface:
+        efi = f"{disk_name}1"
+        root_partition = f"{disk_name}2"
+    elif "nvme" in interface:
+        efi = f"{disk_name}p1"
+        root_partition = f"{disk_name}p2"
+    else:
+        message(stdscr, f"No se pudo determinar la interfaz de {disk_name}.")
+        return
+    subprocess.run(["mkfs.fat", "-F32", f"/dev/{efi}"], check=True)
+
+################################################################################
+############################# Encrypting ######################################
+################################################################################
+
+def encrypt_disk(stdscr):
+    try:
+        subprocess.run(["cryptsetup", "erase", f"/dev/{root_partition}"], check=True)
+    except subprocess.CalledProcessError as e:
+        message(stdscr, f"No se pudo limpiar el disco. {e}")
+        return
+    
+    luks_pass = input("Introduce la contraseña LUKS: ")
+    luks_pass_confirm = input("Confirma la contraseña LUKS: ")
+    
+    if luks_pass != luks_pass_confirm:
+        message(stdscr, "Error: Las contraseñas no coinciden.")
+        return
+    subprocess.run(["cryptsetup", "-y", "-v", "luksFormat", "--type", "luks2", "--force-password", f"/dev/{root_partition}"],
+        input=luks_pass, text=True, check=True )
+    subprocess.run(["cryptsetup", "luksOpen", f"/dev/{root_partition}", "root"], input=luks_pass, text=True, check=True)
+    root_partition = "/dev/mapper/root"
+
+def btrfs_partition(stdscr):
+    message(stdscr, "Formateando con BTRFS...")
+    
+
 curses.wrapper(main)
+
+# subprocess.run(["pacman", "-S", "--noconfirm", "linux-zen-headers", "linux-zen", "btrfs-progs", "efibootmgr", "grub", "os-prober", "networkmanager", "openssh", "sudo", "dhcpcd", "base-devel", "zsh", "zsh-completions", "vim", "git", "curl", "wget", "man-db", "man-pages", "dosfstools", "e2fsprogs", "exfat-utils", "ntfs-3g", "smartmontools", "dialog", "man-db", "man-pages", "texinfo", "pacman-contrib", "snapper", "xdg-user-dirs", "xdg-utils", "tlp", "reflector", "neofetch", "amd-ucode"], check=True)
