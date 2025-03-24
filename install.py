@@ -153,13 +153,15 @@ def disk_partitioning(stdscr):
     curses.curs_set(1)
     stdscr.refresh()
     disk_name = stdscr.getstr(12, 3, 7).decode("utf-8")
+    stdscr.addstr(13, 3, f"Has escrito: {disk_name}")
+    stdscr.refresh()
+    stdscr.getch()
     commands = [
         "g", "n", "1", "", "+512M", "t", "1", "n", "2", "", "", "w"
     ]
-    
     process = subprocess.Popen(["fdisk", f"/dev/{disk_name}"], stdin=subprocess.PIPE, text=True)
     process.communicate("\n".join(commands))
-    print("Particiones creadas:")
+    stdscr.addstr(10, 3, "Particiones creadas:", curses.color_pair(1))
     subprocess.run(["lsblk", f"/dev/{disk_name}"], check=True)
 
 curses.wrapper(main)
