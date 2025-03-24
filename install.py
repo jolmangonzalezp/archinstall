@@ -4,7 +4,15 @@ import re
 import subprocess
 
 import requests
-global disk_name, efi, root_partition
+
+data = ""
+disk_name = ""
+efi = ""
+root_partition = ""
+locale = ""
+timezone = ""
+hostname = ""
+
 enter = "\npresione enter para continuar"
 
 ################################################################################
@@ -12,12 +20,14 @@ enter = "\npresione enter para continuar"
 ################################################################################
 
 def main(stdscr):
+    global data
     curses.start_color()
     curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
     stdscr.clear()
+    data = get_ipapi_data(stdscr)
     stdscr.refresh()    
 
-    menu = ['Locale', 'Disk Partition', 'Formatear', 'Encriptar', 'Salir']
+    menu = ['Disk Partitioning', 'Formatear', 'Encriptar', 'Salir']
     current_row = 0
     
     while True:
@@ -38,15 +48,7 @@ def main(stdscr):
         elif key == curses.KEY_DOWN and current_row < len(menu) - 1:
             current_row += 1
         elif key == curses.KEY_ENTER or key in [10, 13]:
-            if menu[current_row] == 'Locale':
-                global get_locale
-                stdscr.clear()
-                stdscr.addstr(1, 2, "Definiendo idioma...", curses.color_pair(1))
-                get_locale = get_ipapi_data(stdscr)
-                set_locale(stdscr, root="")
-                stdscr.refresh()
-                stdscr.getch()
-            elif menu[current_row] == 'Disk Partition':
+            if menu[current_row] == 'Disk Partitioning':
                 stdscr.clear()
                 disk_partitioning(stdscr)
                 stdscr.refresh()
@@ -59,6 +61,11 @@ def main(stdscr):
             elif menu[current_row] == 'Encriptar':
                 stdscr.clear()
                 encrypt_disk(stdscr)
+                stdscr.refresh()
+                stdscr.getch()
+            elif menu[current_row] == 'BTRFS Partitioning':
+                stdscr.clear()
+                btrfs_partitioning(stdscr)
                 stdscr.refresh()
                 stdscr.getch()
             else:
@@ -86,8 +93,8 @@ def get_ipapi_data(stdscr):
         response = requests.get('https://ipapi.co/json/', headers=headers)
         if response.status_code == 200:
             data = response.json()
-            locale = data.get("languages")
-            return locale
+            message(stdscr, f"JSON obtenido: {data}")
+            return data
         else:
             message(stdscr, f"Error: Código de estado {response.status_code}")
             return None, None
@@ -102,20 +109,21 @@ def get_ipapi_data(stdscr):
         return None, None
     
 def set_locale(stdscr, root=""):
+    global data
     env = os.environ.copy()
-    env["LANG"] = f"{get_locale}.UTF-8"
+    env["LANG"] = f"{data['languages']}.UTF-8"
     print("Configurando el teclado y el idioma...")
     locale_gen_path = f"{root}/etc/locale.gen"
     locale_conf_path = f"{root}/etc/locale.conf"
     with open(locale_gen_path, "r") as file:
         lines = file.readlines()  
     updated_lines = [
-        re.sub(f"^#{get_locale}.UTF-8", f"{get_locale}.UTF-8", line) for line in lines
+        re.sub(f"^#{data['languages']}.UTF-8", f"{data['languages']}.UTF-8", line) for line in lines
     ]
     with open(locale_gen_path, "w") as file:
         file.writelines(updated_lines)
     with open(locale_conf_path, "w") as file:
-        file.write(f"LANG={get_locale}.UTF-8")
+        file.write(f"LANG={data['languages']}.UTF-8")
     subprocess.run(["locale-gen"], check=True)
     message(stdscr, "El teclado y el idioma se han configurado correctamente.")
 
@@ -218,7 +226,7 @@ def encrypt_disk(stdscr):
     subprocess.run(["cryptsetup", "luksOpen", f"/dev/{root_partition}", "root"], input=luks_pass, text=True, check=True)
     root_partition = "/dev/mapper/root"
 
-def btrfs_partition(stdscr):
+def btrfs_partitioning(stdscr):
     message(stdscr, "Formateando con BTRFS...")
     
 
