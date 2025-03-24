@@ -51,6 +51,16 @@ def main(stdscr):
                 disk_partitioning(stdscr)
                 stdscr.refresh()
                 stdscr.getch()
+            elif menu[current_row] == 'Formatear':
+                stdscr.clear()
+                format_disk(stdscr)
+                stdscr.refresh()
+                stdscr.getch()
+            elif menu[current_row] == 'Encriptar':
+                stdscr.clear()
+                encrypt_disk(stdscr)
+                stdscr.refresh()
+                stdscr.getch()
             else:
                 break
 
