@@ -48,7 +48,6 @@ def main(stdscr):
                 stdscr.getch()
             elif menu[current_row] == 'Disk Partition':
                 stdscr.clear()
-                stdscr.addstr(1, 2, "Particionando disco...", curses.color_pair(1))
                 disk_partitioning(stdscr)
                 stdscr.refresh()
                 stdscr.getch()
