@@ -4,8 +4,6 @@ import subprocess
 
 import requests
 
-global get_locale
-
 enter = "\npresione enter para continuar"
 
 ################################################################################
@@ -40,6 +38,7 @@ def main(stdscr):
             current_row += 1
         elif key == curses.KEY_ENTER or key in [10, 13]:
             if menu[current_row] == 'Locale':
+                global get_locale
                 stdscr.clear()
                 stdscr.addstr(1, 2, "Definiendo idioma...", curses.color_pair(1))
                 get_locale = get_ipapi_data(stdscr)
