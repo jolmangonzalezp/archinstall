@@ -25,10 +25,10 @@ def main(stdscr):
     curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
     stdscr.clear()
     data = get_ipapi_data(stdscr)
-    message(stdscr, f"JSON obtenido: {data['languages']}")
+    set_locale(stdscr, root="")
     stdscr.refresh()    
 
-    menu = ['Disk Partitioning', 'Formatear', 'Encriptar', 'Salir']
+    menu = ['Particionar el disco', 'Formatear', 'Encriptar', 'Particionar BTRFS', 'Montar particiones', 'Salir']
     current_row = 0
     
     while True:
@@ -49,7 +49,7 @@ def main(stdscr):
         elif key == curses.KEY_DOWN and current_row < len(menu) - 1:
             current_row += 1
         elif key == curses.KEY_ENTER or key in [10, 13]:
-            if menu[current_row] == 'Disk Partitioning':
+            if menu[current_row] == 'Particionar el disco':
                 stdscr.clear()
                 disk_partitioning(stdscr)
                 stdscr.refresh()
@@ -64,9 +64,14 @@ def main(stdscr):
                 encrypt_disk(stdscr)
                 stdscr.refresh()
                 stdscr.getch()
-            elif menu[current_row] == 'BTRFS Partitioning':
+            elif menu[current_row] == 'Particionar BTRFS':
                 stdscr.clear()
                 btrfs_partitioning(stdscr)
+                stdscr.refresh()
+                stdscr.getch()
+            elif menu[current_row] == 'Montar particiones':
+                stdscr.clear()
+                mount_partitions()
                 stdscr.refresh()
                 stdscr.getch()
             else:
@@ -118,7 +123,7 @@ def set_locale(stdscr, root=""):
     with open(locale_gen_path, "r") as file:
         lines = file.readlines()  
     updated_lines = [
-        re.sub(f"^#{data['languages']}.UTF-8", f"{data['languages']}.UTF-8", line) for line in lines
+        re.sub(f"^#{data['languages']}.UTF-8 UFT-8", f"{data['languages']}.UTF-8 UTF-8", line) for line in lines
     ]
     with open(locale_gen_path, "w") as file:
         file.writelines(updated_lines)
@@ -164,6 +169,7 @@ def connect_to_internet(stdscr):
 ################################################################################
 
 def disk_partitioning(stdscr):
+    global disk_name
     disks_output = subprocess.run(["lsblk", "-dno", "NAME,SIZE"], capture_output = True, text = True).stdout
     stdscr.addstr(3, 2, f"Discos disponibles: \n{disks_output}", curses.color_pair(1))
     stdscr.addstr(10, 3, "Selecciona el disco a particionar: ", curses.color_pair(1))
@@ -190,6 +196,7 @@ def disk_partitioning(stdscr):
 ################################################################################
 
 def format_disk(stdscr):
+    global efi, root_partition, disk_name
     interface = subprocess.run(
         ["lsblk", "-o", "NAME,TRAN"], capture_output=True, text=True
     ).stdout.splitlines() 
@@ -209,6 +216,8 @@ def format_disk(stdscr):
 ################################################################################
 
 def encrypt_disk(stdscr):
+    global root_partition, disk_name
+    stdscr.addstr(10, 3, "Encriptando el disco...", curses.color_pair(1))
     try:
         subprocess.run(["cryptsetup", "erase", f"/dev/{root_partition}"], check=True)
     except subprocess.CalledProcessError as e:
@@ -227,7 +236,32 @@ def encrypt_disk(stdscr):
     root_partition = "/dev/mapper/root"
 
 def btrfs_partitioning(stdscr):
-    message(stdscr, "Formateando con BTRFS...")
+    global root_partition
+    stdscr.addstr(10, 3, "Particiones BTRFS:", curses.color_pair(1))
+    subprocess.run(["mkfs.btrfs", root_partition], check=True)
+    os.makedirs("/mnt", exist_ok=True)
+    subprocess.run(["mount", root_partition, "/mnt"], check=True)
+    
+    for subvolume in ["@", "@home", "@snapshots", "@var_log", "@swap"]:
+        subprocess.run(["btrfs", "subvolume", "create", f"/mnt/{subvolume}"], check=True)
+
+def mount_partitions():
+    global root_partition, efi
+    subprocess.run(["umount", "/mnt"], check=True)
+    mount_options = "noatime,compress=zstd,space_cache=v2"
+    subvolumes = ["@", "@home", "@snapshots", "@var_log", "@swap"]
+    mount_points = ["", "home", "snapshots", "var/log", "swap"]
+
+    for point in mount_points:
+        os.makedirs(f"/mnt/{point}", exist_ok=True)
+
+    for subvolume, point in zip(subvolumes, mount_points):
+        subprocess.run(["mount", "-o", f"{mount_options},subvol={subvolume}", root_partition, f"/mnt/{point}"], check=True)
+
+    os.makedirs("/mnt/boot", exist_ok=True)
+    subprocess.run(["mount", f"/dev/{efi}", "/mnt/boot"], check=True)
+    print("Particiones montadas.")
+
     
 
 curses.wrapper(main)
