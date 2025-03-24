@@ -43,7 +43,7 @@ def main(stdscr):
                 stdscr.clear()
                 stdscr.addstr(1, 2, "Definiendo idioma...", curses.color_pair(1))
                 get_locale = get_ipapi_data(stdscr)
-                set_locale(stdscr, get_locale, root="")
+                set_locale(stdscr, root="")
                 stdscr.refresh()
                 stdscr.getch()
             elif menu[current_row] == 'Disk Partition':
@@ -92,21 +92,21 @@ def get_ipapi_data(stdscr):
         message(stdscr, f"Error: {e}")
         return None, None
     
-def set_locale(stdscr, locale, root=""):
+def set_locale(stdscr, root=""):
     print("Configurando el teclado y el idioma...")
     locale_gen_path = f"{root}/etc/locale.gen"
     locale_conf_path = f"{root}/etc/locale.conf"
     with open(locale_gen_path, "r") as file:
         lines = file.readlines()  
     updated_lines = [
-        re.sub(f"^#{locale}.UTF-8", f"{locale}.UTF-8", line) for line in lines
+        re.sub(f"^#{get_locale}.UTF-8", f"{get_locale}.UTF-8", line) for line in lines
     ]
     with open(locale_gen_path, "w") as file:
         file.writelines(updated_lines)
     with open(locale_conf_path, "w") as file:
-        file.write(f"LANG={locale}.UTF-8")
+        file.write(f"LANG={get_locale}.UTF-8")
     subprocess.run(["locale-gen"], check=True)
-    subprocess.run(["export", f"LANG={locale}.UTF-8"], check=True)
+    subprocess.run(["export", f"LANG={get_locale}.UTF-8"], check=True)
     message(stdscr, "El teclado y el idioma se han configurado correctamente.")
 
 ################################################################################
