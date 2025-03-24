@@ -150,8 +150,8 @@ def disk_partitioning(stdscr):
     disks_output = subprocess.run(["lsblk", "-dno", "NAME,SIZE"], capture_output = True, text = True).stdout
     stdscr.addstr(3, 2, f"Discos disponibles: \n{disks_output}", curses.color_pair(1))
     stdscr.addstr(10, 3, "Selecciona el disco a particionar: ", curses.color_pair(1))
-    stdscr.refresh()
     curses.curs_set(1)
+    stdscr.refresh()
     disk_name = stdscr.getstr(12, 3, 7).decode("utf-8")
     commands = [
         "g", "n", "1", "", "+512M", "t", "1", "n", "2", "", "", "w"
