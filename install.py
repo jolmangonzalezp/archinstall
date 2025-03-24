@@ -148,7 +148,7 @@ def connect_to_internet(stdscr):
 
 def disk_partitioning(stdscr):
     disks_output = subprocess.run(["lsblk", "-dno", "NAME,SIZE"], capture_output = True, text = True).stdout
-    message(stdscr ,f"Discos disponibles: \n{disks_output}")
+    stdscr.addstr(3, 2, f"Discos disponibles: \n{disks_output}", curses.color_pair(1))
     stdscr.addstr(10, 3, "Selecciona el disco a particionar: ", curses.color_pair(1))
     stdscr.refresh()
     curses.curs_set(1)
