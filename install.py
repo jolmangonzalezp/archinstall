@@ -4,7 +4,7 @@ import re
 import subprocess
 
 import requests
-
+global disk_name, efi, root_partition
 enter = "\npresione enter para continuar"
 
 ################################################################################
@@ -161,7 +161,7 @@ def disk_partitioning(stdscr):
     stdscr.addstr(10, 3, "Selecciona el disco a particionar: ", curses.color_pair(1))
     curses.curs_set(1)
     stdscr.refresh()
-    global disk_name
+    
     ## I have to validate the disk name
     disk_name = stdscr.getstr(12, 3, 7).decode("utf-8")
     stdscr.addstr(13, 3, f"Has escrito: {disk_name}")
@@ -182,7 +182,6 @@ def disk_partitioning(stdscr):
 ################################################################################
 
 def format_disk(stdscr):
-    global efi, root_partition
     interface = subprocess.run(
         ["lsblk", "-o", "NAME,TRAN"], capture_output=True, text=True
     ).stdout.splitlines() 
