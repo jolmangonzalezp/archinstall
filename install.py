@@ -4,10 +4,9 @@ import subprocess
 
 import requests
 
-from modules import locale, message
+global get_locale
 
-get_locale = ""
-get_timezone = ""
+enter = "\npresione enter para continuar"
 
 ################################################################################
 ##################################### Main #####################################
@@ -57,11 +56,20 @@ def main(stdscr):
                 break
 
 ################################################################################
+################################### Messages ###################################
+################################################################################
+
+def message(stdscr, message):
+    stdscr.addstr(3, 2, message+enter, curses.color_pair(1))
+    stdscr.refresh()
+    stdscr.getch()
+
+
+################################################################################
 ######################## Definir idioma y zona horaria #########################
 ################################################################################
 
-def get_ipapi_data(stdscr):
-     
+def get_ipapi_data(stdscr): 
     try:
         headers = {
         "User-Agent": "curl/7.68.0"
@@ -70,7 +78,6 @@ def get_ipapi_data(stdscr):
         if response.status_code == 200:
             data = response.json()
             locale = data.get("languages")
-            message(stdscr, f"Idioma: {locale}")
             return locale
         else:
             message(stdscr, f"Error: Código de estado {response.status_code}")
