@@ -93,7 +93,7 @@ def get_ipapi_data(stdscr):
         response = requests.get('https://ipapi.co/json/', headers=headers)
         if response.status_code == 200:
             data = response.json()
-            message(stdscr, f"JSON obtenido: {data}")
+            message(stdscr, f"JSON obtenido: {data['languages']}")
             return data
         else:
             message(stdscr, f"Error: Código de estado {response.status_code}")
