@@ -1,4 +1,5 @@
 import curses
+import os
 import re
 import subprocess
 
@@ -92,6 +93,8 @@ def get_ipapi_data(stdscr):
         return None, None
     
 def set_locale(stdscr, root=""):
+    env = os.environ.copy()
+    env["LANG"] = f"{get_locale}.UTF-8"
     print("Configurando el teclado y el idioma...")
     locale_gen_path = f"{root}/etc/locale.gen"
     locale_conf_path = f"{root}/etc/locale.conf"
@@ -105,7 +108,6 @@ def set_locale(stdscr, root=""):
     with open(locale_conf_path, "w") as file:
         file.write(f"LANG={get_locale}.UTF-8")
     subprocess.run(["locale-gen"], check=True)
-    subprocess.run(["export", f"LANG={get_locale}.UTF-8"], check=True)
     message(stdscr, "El teclado y el idioma se han configurado correctamente.")
 
 ################################################################################
