@@ -25,6 +25,7 @@ def main(stdscr):
     curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
     stdscr.clear()
     data = get_ipapi_data(stdscr)
+    message(stdscr, f"JSON obtenido: {data['languages']}")
     stdscr.refresh()    
 
     menu = ['Disk Partitioning', 'Formatear', 'Encriptar', 'Salir']
@@ -93,7 +94,6 @@ def get_ipapi_data(stdscr):
         response = requests.get('https://ipapi.co/json/', headers=headers)
         if response.status_code == 200:
             data = response.json()
-            message(stdscr, f"JSON obtenido: {data['languages']}")
             return data
         else:
             message(stdscr, f"Error: Código de estado {response.status_code}")
