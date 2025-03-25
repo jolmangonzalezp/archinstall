@@ -77,9 +77,9 @@ function particion_disco() {
     # Definir el tamaño de la partición swap (ejemplo: 2048 MB para swap)
     size=$(awk '/MemTotal/ {print $2 / 1024}' /proc/meminfo)
 
-    if (( $(echo "$size > 8" | bc -l) )); then
+    if (( $(echo "$size > 8192" | bc -l) )); then
         swap_size=$(echo "$size / 2" | bc)
-    elif (( $(echo "$size <= 8" | bc -l) && $(echo "$size > 2" | bc -l) )); then
+    elif (( $(echo "$size <= 8192" | bc -l) && $(echo "$size > 2048" | bc -l) )); then
         swap_size=$size
     else
         swap_size=$(echo "$size * 2" | bc)
