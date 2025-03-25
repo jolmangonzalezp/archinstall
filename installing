@@ -1,8 +1,8 @@
 #!/bin/sh
 
 efi=""
-root_partition="/dev/mapper/cryptroot"
-crypy_root=""
+root_partition=""
+
 locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
 timezone=$(curl -s https://ipapi.co/timezone | tr ',' '\n' | head -n 1)
 hostname=$(hostnamectl | grep "Hardware Model" | awk -F': ' '{gsub(/ /, "_", $2); print $2}')
@@ -135,6 +135,7 @@ function encripting() {
 
     echo "Encriptación completada exitosamente."
     cryptsetup open /dev/"$root_partition" cryptroot
+    root_partition="/dev/mapper/cryptroot"
     echo "Encriptación abierta exitosamente."
     
     btrfs_partition
@@ -144,8 +145,8 @@ function encripting() {
 
 function btrfs_partition() {
     echo "Formating btrfs"
-    mkfs.btrfs $crypy_root
-    mount $crypy_root /mnt
+    mkfs.btrfs $root_partition
+    mount $root_partition /mnt
     cd /mnt
     btrfs subvolume create @
     btrfs subvolume create @home
@@ -158,12 +159,12 @@ function btrfs_partition() {
 
 function mount_partitions() {
     umount /mnt
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ $crypy_root /mnt
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ $root_partition /mnt
     mkdir -p /mnt/{boot,home,.snapshots,var/log,swap}
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home $crypy_root /mnt/home
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots $crypy_root /mnt/.snapshots
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log $crypy_root /mnt/var/log
-    mount -o noatime,subvol=@swap $crypy_root /mnt/swap
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home $root_partition /mnt/home
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots $root_partition /mnt/.snapshots
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log $root_partition /mnt/var/log
+    mount -o noatime,subvol=@swap $root_partition /mnt/swap
     mount /dev/${efi} /mnt/boot
     swap
 }
