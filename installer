@@ -85,7 +85,7 @@ function particion_disco() {
         swap_size=$(echo "$size * 2" | bc)
     fi
 
-    root=$(( ($disk_size - 512 - $swap_size) / 1024 ))
+    root=$(echo "scale=2; ($disk_size - 512 - $swap_size) / 1024" | bc)
 
     echo "Tamaño para root: ${root} GB"
     sleep 10
