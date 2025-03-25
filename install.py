@@ -251,13 +251,16 @@ def encrypt_disk(stdscr):
         subprocess.run(["cryptsetup", "erase", f"/dev/{root_partition}"], check=True)
     except subprocess.CalledProcessError as e:
         message(stdscr, f"No se pudo limpiar el disco. {e}")
-    
-    luks_pass = input("Introduce la contraseña LUKS: ")
-    luks_pass_confirm = input("Confirma la contraseña LUKS: ")
+    stdscr.addstr(11, 3, "Ingrese la contraseña LUKS:", curses.color_pair(1))
+    luks_pass = stdscr.getstr(12, 3).decode("utf-8")
+    stdscr.addstr(11, 3, "Compruebe la contraseña LUKS:", curses.color_pair(1))
+    luks_pass_confirm = stdscr.getstr(12, 3).decode("utf-8")
     
     if luks_pass != luks_pass_confirm:
         message(stdscr, "Error: Las contraseñas no coinciden.")
-        return
+    else:
+        message(stdscr, f"Contraseña LUKS correcta. La constraseña LUKS es: {luks_pass}\n\tIniciando encriptación...")
+        
     subprocess.run(["cryptsetup", "-y", "-v", "luksFormat", "--type", "luks2", "--force-password", f"/dev/{root_partition}"],
         input=luks_pass, text=True, check=True )
     subprocess.run(["cryptsetup", "luksOpen", f"/dev/{root_partition}", "root"], input=luks_pass, text=True, check=True)
