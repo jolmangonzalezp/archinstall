@@ -2,315 +2,193 @@
 
 efi=""
 root_partition=""
-
-locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
-timezone=$(curl -s https://ipapi.co/timezone | tr ',' '\n' | head -n 1)
-hostname=$(hostnamectl | grep "Hardware Model" | awk -F': ' '{gsub(/ /, "_", $2); print $2}')
-swap_size=""
 swap_partition=""
+swap_size=""
+locale=""
+timezone=""
 
-function configurar_teclado_idioma() {
-    echo "Configurando el teclado y el idioma"
-    # echo $locale".UTF-8 UTF-8" >> /etc/locale.gen && locale-gen
-    sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && locale-gen
-    export LANG=$locale.UTF-8
+function get_timezone_locale() {
+    locale=$(curl -s https://ipapi.co/languages | cut -d',' -f1)
+    timezone=$(curl -s https://ipapi.co/timezone)
+}
+
+function forward() {
+    echo "Presiona Enter para continuar..."
+    read -r
     clear
-    echo "El teclado y el idioma se han configurado correctamente"
-    
+}
+
+function set_locale_language() {
+    echo "Configurando el teclado y el idioma..."
+    sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /etc/locale.gen
+    locale-gen
+    export LANG="${locale}.UTF-8"
+    ln -sf "/usr/share/zoneinfo/${timezone}" /etc/localtime
+    hwclock --systohc
+    echo "Configuración regional y de teclado aplicada correctamente."
+    forward
     connect_to_internet
 }
 
-function rfkill_unblock() {
-    rfkill_devices=$(rfkill list | grep -E "^[0-9]+:" | awk -F: '{print $1}')
-    for ((id = 0; id < rfkill_devices; i++)); do
-        if [ -n "$i" ]; then
-            soft_blockd=$(rfkill list $id | grep "Soft blocked" | awk '{print $3}')
-            hard_blockd=$(rfkill list $id | grep "Hard blocked" | awk '{print $3}')
-            
-            if [ "$soft_blockd" == "yes" ]; then
-                rfkill unblock "$id"
-                echo "Desbloqueado a nivel de software."
-            fi
-            if [ "$hard_blockd" == "yes" ]; then
-                echo "El dispositivo con ID $id está bloqueado a nivel de hardware. No se puede desbloquear automáticamente."
-            fi
-        else
-            echo "No se detectó un dispositivo con ID válido."
-        fi
-    done
+function unblock_rfkill() {
+    rfkill list | grep -q "Soft blocked: yes" && rfkill unblock all
+    echo "Dispositivos de red desbloqueados si estaban bloqueados."
 }
 
 function connect_to_internet() {
-    if ping -c1 8.8.8.8 &>/dev/null; then
-        echo "Conexión a Internet: OK"
+    if ping -c 1 8.8.8.8 &>/dev/null; then
+        echo "Conexión a Internet detectada."
     else
-        rfkill_unblock
-        echo "No hay conexión a Internet"
-        echo "Para conectarse a Internet, ejecuta: "
-        echo "device list"
-        echo "station wlan0 scan"
-        echo "station wlan0 get-networks"
-        echo "station wlan0 connect NOMBRE_RED"
-        echo "station wlan0 connect-hidden NOMBRE_RED | En caso de que la red sea oculta"
-        echo "y por último, exit"
-        sleep 5
-        echo "Presiona Enter para iniciar el proceso de conexión a Internet"
-        read -r
+        desbloquear_rfkill
+        echo "No se detectó conexión a Internet. Iniciando configuración manual con iwctl..."
         iwctl
     fi
     timedatectl set-ntp true
-    particion_disco
+    forward
+    disk_partitioning
 }
 
-function particion_disco() {
-    # Listar discos disponibles
-    disks=$(lsblk -dno NAME,SIZE | awk '{print $1, $2}')
-    echo "Discos disponibles:"
-    echo "$disks"
-    read -p "Selecciona el disco a particionar: " disk_name
-
-    # Obtener tamaño del disco en MB
-    disk_size=$(( $(cat /sys/class/block/${disk_name}/size) * 512 / 1024 / 1024 ))
-
-    swap_size=""
-
-    # Definir el tamaño de la partición swap (ejemplo: 2048 MB para swap)
-    size=$(awk '/MemTotal/ {print $2 / 1024}' /proc/meminfo)
-
-    if (( $(echo "$size > 8192" | bc -l) )); then
-        swap_size=$(echo "$size / 2" | bc)
-    elif (( $(echo "$size <= 8192" | bc -l) && $(echo "$size > 2048" | bc -l) )); then
-        swap_size=$size
+function disk_partitioning() {
+    echo "Detectando discos disponibles..."
+    lsblk -dno NAME,SIZE
+    read -p "Selecciona el disco para particionar (ej. sda, nvme0n1): " disk_name
+    
+    ram_size=$(awk '/MemTotal/ {print $2 / 1024}' /proc/meminfo)
+    if (( ram_size > 8192 )); then
+        swap_size=$(( ram_size / 2 ))
+        elif (( ram_size <= 8192 )); then
+        swap_size=$(( ram_size ))
     else
-        swap_size=$(echo "$size * 2" | bc)
+        swap_size=$(( ram_size * 2 ))
     fi
-
-    root=$(echo "scale=2; ($disk_size - 512 - $swap_size) / 1024" | bc)
-
-    echo "Tamaño para root: ${root} GB"
-    sleep 10
-
+    
+    echo "Particionando el disco /dev/${disk_name}..."
     (
         echo "g";
-        echo "n";
-        echo "1";
-        echo "";
-        echo "+512M";
-        echo "t";
-        echo "1";
-        echo "n";
-        echo "2";
-        echo "";
-        echo "+${root}G";
-        echo "n";
-        echo "3";
-        echo "";
-        echo "";
-        echo "t";
-        echo "19";
+        echo "n"; echo "1"; echo ""; echo "+512M"; echo "t"; echo "1"; # EFI
+        echo "n"; echo "2"; echo ""; echo "-${swap_size}M"; # Root
+        echo "n"; echo "3"; echo ""; echo ""; # Swap
         echo "w";
-    ) | fdisk "/dev/$disk_name"
-
-    sleep 5
-    clear
-    echo "Particiones creadas:"
-    lsblk "/dev/$disk_name"
-    sleep 5
-
-    disk_formating "$disk_name"
+    ) | fdisk "/dev/${disk_name}"
+    
+    if [[ "$disk_name" == "nvme"* ]]; then
+        efi="/dev/${disk_name}p1"
+        root_partition="/dev/${disk_name}p2"
+        swap_partition="/dev/${disk_name}p3"
+    else
+        efi="/dev/${disk_name}1"
+        root_partition="/dev/${disk_name}2"
+        swap_partition="/dev/${disk_name}3"
+    fi
+    
+    echo "Particiones creadas correctamente:"
+    lsblk "/dev/${disk_name}"
+    forward
+    disk_formating
 }
-
 
 function disk_formating() {
-    local disk_name="$1"
-    shift
-    interface=$(lsblk -o NAME,TRAN | grep "^$disk_name " | awk '{print $2}')
-    
-    if [[ "$interface" == "sata" ]]; then
-        efi="${disk_name}1"
-        root_partition="${disk_name}2"
-        swap_partition="${disk_name}3"
-        elif [[ "$interface" == "nvme" ]]; then
-        efi="${disk_name}p1"
-        root_partition="${disk_name}p2"
-        swap_partition="${disk_name}p3"
-    else
-        echo "No se pudo determinar la interfaz de $disk_name."
-    fi
-    mkfs.fat -F32 "/dev/${efi}"
-    mkswap -f "$swap_partition"
-    swapom "$swap_partition"
-    encripting
+    echo "Formateando particiones..."
+    mkfs.fat -F32 "$efi"
+    mkswap "$swap_partition"
+    swapon "$swap_partition"
+    forward
+    encryption
 }
 
-function encripting() {
-    set -e  # Detener la ejecución si ocurre un error
-    echo "Encriptando el disco"
-    
-    # Verificar que root_partition esté definido globalmente
-    if [[ -z "$root_partition" ]]; then
-        echo "Error: La variable global root_partition no está definida."
-        return 1
-    fi
-    
-    # Verificar si la partición existe
-    if [[ ! -e /dev/"$root_partition" ]]; then
-        echo "Error: El dispositivo /dev/$root_partition no existe."
-        return 1
-    fi
-    
-    # Verificar si la partición está montada y desmontarla si es necesario
-    if mount | grep -q "/dev/$root_partition"; then
-        echo "El dispositivo /dev/$root_partition está montado. Desmontando..."
-        umount "/dev/$root_partition"
-    fi
-    
-    # Limpiar la partición si ya tiene datos o configuraciones previas
-    echo "Limpiando el disco..."
-    cryptsetup close cryptroot || echo "Advertencia: No se pudo limpiar el disco. Verifica permisos."
-    
-    # Formatear y abrir la partición con LUKS
-    echo "Configurando LUKS en el disco..."
-    cryptsetup -y -v luksFormat --type luks2 --force-password /dev/"$root_partition" --key-file -
-    
-    echo "Encriptación completada exitosamente."
-    cryptsetup open /dev/"$root_partition" cryptroot
+function encryption() {
+    echo "Configurando encriptación en la partición raíz..."
+    cryptsetup luksFormat "$root_partition"
+    cryptsetup open "$root_partition" cryptroot
     root_partition="/dev/mapper/cryptroot"
-    echo "Encriptación abierta exitosamente."
-    
-    btrfs_partition
+    forward
+    btrfs_setup
 }
 
-function btrfs_partition() {
-    echo "Formating btrfs"
-    mkfs.btrfs $root_partition
-    mount $root_partition /mnt
-    cd /mnt
-    btrfs subvolume create @
-    btrfs subvolume create @home
-    btrfs subvolume create @snapshots
-    btrfs subvolume create @var_log
-    cd
-    mount_partitions
-}
-
-function mount_partitions() {
+function btrfs_setup() {
+    echo "Formateando partición raíz como Btrfs..."
+    mkfs.btrfs "$root_partition"
+    mount "$root_partition" /mnt
+    btrfs subvolume create /mnt/@
+    btrfs subvolume create /mnt/@home
+    btrfs subvolume create /mnt/@snapshots
+    btrfs subvolume create /mnt/@var_log
     umount /mnt
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ $root_partition /mnt
+    
+    echo "Montando subvolúmenes..."
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ "$root_partition" /mnt
     mkdir -p /mnt/{boot,home,.snapshots,var/log}
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home $root_partition /mnt/home
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots $root_partition /mnt/.snapshots
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log $root_partition /mnt/var/log
-    mount /dev/${efi} /mnt/boot
-    instalar_sistema
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home "$root_partition" /mnt/home
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots "$root_partition" /mnt/.snapshots
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log "$root_partition" /mnt/var/log
+    mount "$efi" /mnt/boot
+    forward
+    base_installation
 }
 
-function swap() {
-    size=$(awk '/MemTotal/ {print $2 / 1024}' /proc/meminfo)
-
-    if (( $(echo "$size > 8" | bc -l) )); then
-        swap_size=$(echo "$size / 2" | bc)
-    elif (( $(echo "$size <= 8" | bc -l) && $(echo "$size > 2" | bc -l) )); then
-        swap_size=$size
+function base_installation() {
+    echo "Instalando el sistema base..."
+    packages = "base base-devel linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub grub-btrfs os-prober networkmanager openssh sudo dhcpcd zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch inotify-tools pipewire pipewire-alsa pipewire-pulse pipewire-jack zsh-autosuggestions zsh-syntax-highlighting net-tools ifplugd iw wireless_tools wpa_supplicant dialog wireless-regdb bluez bluez-alsa bluez-cups bluez-firmware bluez-utils"
+    if [[ $(lscpu | grep "Model name" | awk '{print $3}') == "AMD" ]]; then
+        pacstrap -K /mnt $packages amd-ucode
     else
-        swap_size=$(echo "$size * 2" | bc)
+        pacstrap -K /mnt $packages intel-ucode
     fi
-    return $swap_size
-    
-    # if [ -d /mnt/swap ]; then
-    #     cd /mnt/swap || exit 1
-    #     btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
-    #     swapon ./swapfile
-    #     swapfile="/swap/swapfile"
-    #     chmod 600 /mnt/swap/swapfile
-    #     cd || exit 1
-
-    # else
-    #     echo "Error: El directorio /mnt/swap no existe."
-    #     return 1
-    # fi
-    
+    forward
+    generate_fstab
 }
 
-
-function instalar_sistema() {
-    cpu_brand=$(lscpu | grep "Model name" | awk '{print $3}')
-    if [[ $cpu_brand == "AMD" ]]; then
-        pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch amd-ucode
-    else
-        pacstrap /mnt base linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub os-prober networkmanager openssh sudo dhcpcd base-devel zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch intel-ucode
-    fi
+function generate_fstab() {
+    echo "Generando fstab..."
     genfstab -U /mnt >> /mnt/etc/fstab
-    configure_new_system
+    echo "Archivo fstab generado correctamente."
+    forward
+    system_setup
 }
 
-function configure_new_system() {
-    clear
-    echo "Configurando el sistema"
-    ln -sf /usr/share/zoneinfo/$timezone /mnt/etc/localtime
-    arch-chroot /mnt hwclock --systohc --utc
-    # echo $locale".UTF-8 UTF-8" >> /mnt/etc/locale.gen
-    sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && 
-    # arch-chroot /mnt export LANG=$locale.UTF-8 &&
-    arch-chroot /mnt locale-gen
-    echo "KEYMAP=la-latin1" >> /etc/vconsole.conf
-    echo "FONT=lat9w-16" >> /etc/vconsole.conf
-    setfont lat9w-16
-    echo $hostname  >> /mnt/etc/hostname
-    echo "127.0.0.1    localhost" >> /mnt/etc/hosts
-    echo "::1          localhost" >> /mnt/etc/hosts
-    echo "127.0.0.1    $hostname.localdomain $hostname" >> /mnt/etc/hosts
-    root_password
-}
-
-function root_password() {
-    while true; do
-        echo "Introduce la nueva contraseña para el usuario root:"
-        read -s passwd
-        echo "Confirma la contraseña:"
-        read -s passwd_confirm
-        if [ "$passwd" == "$passwd_confirm" ]; then
-            echo -e "${passwd}\n${passwd}" | arch-chroot /mnt passwd
-            if [ $? -eq 0 ]; then
-                echo "La contraseña de root ha sido configurada correctamente."
-                break
-            else
-                echo "Hubo un error al configurar la contraseña de root. Inténtalo nuevamente."
-            fi
-        else
-            echo "Error: Las contraseñas no coinciden. Intenta de nuevo."
-        fi
-    done
-    grub
-}
-
-function grub () {
-    swapfile=$(findmnt -no UUID -T /swap/swapfile)
-    resume_offset=$(filefrag -v $swapfile | awk '/ 1:/ {getline; print $4; exit}' | grep -o '^[0-9]*')
-    sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
-    sed -i "s/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems resume fsck)/" /mnt/etc/mkinitcpio.conf
-    arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=ArchLinux --recheck
-    uuid=$(blkid $root_partition | awk -F '"' '{print $2}')
-    sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot resume='"${swapfile}"' resume_offset='"${resume_offset}"' "|g' /mnt/etc/default/grub
-
-    sed -i 's/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /mnt/etc/default/grub
-    arch-chroot /mnt mkinitcpio -P
-    arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+function system_setup() {
+    echo "Entrando al sistema para configuración final..."
+    arch-chroot /mnt <<EOF
+ln -sf /usr/share/zoneinfo/$timezone /etc/localtime
+hwclock --systohc
+echo "$locale.UTF-8 UTF-8" > /etc/locale.gen
+locale-gen
+echo "LANG=$locale.UTF-8" > /etc/locale.conf
+echo "KEYMAP=la-latin1" > /etc/vconsole.conf
+echo "$hostname" > /etc/hostname
+echo -e "127.0.0.1\tlocalhost\n::1\tlocalhost\n127.0.1.1\t$hostname.localdomain\t$hostname" > /etc/hosts
+passwd
+sed -i 's/MODULES=()/MODULES=(btrfs)/' /etc/mkinitcpio.conf
+sed -i "s/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems resume fsck)/" /etc/mkinitcpio.conf
+grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+uuid=$(blkid $root_partition | awk -F '"' '{print $2}')
+sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot "|g' /etc/default/grub
+sed -i 's/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
+    mkinitcpio -P
+grub-mkconfig -o /boot/grub/grub.cfg
+systemctl enable NetworkManager
+EOF
+    echo "Instalación completada."
+    forward
     enable_services
 }
 
 function enable_services() {
+    echo "Habilitando servicios..."
     services=("systemd-networkd" "systemd-timesyncd" "systemd-resolved" "NetworkManager.service" "fstrim.timer" "sshd" "paccache.timer")
     for service in "${services[@]}"; do
         arch-chroot /mnt systemctl enable $service
     done
-    umount_partitions
+    forward
+    rebooting
 }
 
-function umount_partitions() {
-    umount -l /mnt/swap
+function rebooting() {
+    echo "El sistema se ha instalado correctamente. Puedes reiniciar ahora."
     umount -R /mnt
+    forward
     reboot
 }
 
-configurar_teclado_idioma
+get_timezone_locale
+set_locale_language
