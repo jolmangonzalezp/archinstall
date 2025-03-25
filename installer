@@ -53,14 +53,14 @@ function disk_partitioning() {
     lsblk -dno NAME,SIZE
     read -p "Selecciona el disco para particionar (ej. sda, nvme0n1): " disk_name
     
-    ram_size=$(awk '/MemTotal/ {print $2 / 1024}' /proc/meminfo)
-    if (( ram_size > 8192 )); then
-        swap_size=$(( ram_size / 2 ))
-        elif (( ram_size <= 8192 )); then
-        swap_size=$(( ram_size ))
-    else
-        swap_size=$(( ram_size * 2 ))
-    fi
+    ram_size=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)  # Convertir a entero
+if (( ram_size > 8192 )); then
+    swap_size=$(( ram_size / 2 ))
+elif (( ram_size <= 8192 )); then
+    swap_size=$(( ram_size ))
+else
+    swap_size=$(( ram_size * 2 ))
+fi
     
     echo "Particionando el disco /dev/${disk_name}..."
     (
