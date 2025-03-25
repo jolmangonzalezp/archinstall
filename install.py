@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 
+import pexpect
 import requests
 
 data = ""
@@ -261,8 +262,29 @@ def encrypt_disk(stdscr):
     else:
         message(stdscr, f"Contraseña LUKS correcta. La constraseña LUKS es: {luks_pass}\n\tIniciando encriptación...")
 
-    subprocess.run(["cryptsetup", "-y", "-v", "luksFormat", "--type", "luks2", "--force-password", f"/dev/{root_partition}"], input=f"YES\n{luks_pass}\n{luks_pass}", text=True, check=True )
-    subprocess.run(["cryptsetup", "luksOpen", f"/dev/{root_partition}", "root"], input=luks_pass, text=True, check=True)
+    try:
+        # Comando para ejecutar
+        command = f"cryptsetup -y -v luksFormat --type luks2 --force-password /dev/{root_partition}"
+        process = pexpect.spawn(command)
+        # Manejar las interacciones del proceso
+        process.expect("Are you sure\\? .*YES.*:")
+        process.sendline("YES")  # Responder "YES" a la advertencia
+        process.expect("Enter passphrase for .*:")
+        process.sendline(luks_pass)  # Enviar la contraseña
+        process.expect("Verify passphrase:")
+        process.sendline(luks_pass)  # Confirmar la contraseña
+
+        # Esperar a que termine el comando
+        process.wait()
+        print(f"El disco /dev/{root_partition} fue cifrado exitosamente.")
+
+    except pexpect.EOF:
+        print(f"Comando terminado inesperadamente: {process.before.decode().strip()}")
+    except pexpect.ExceptionPexpect as e:
+        message( f"Error al ejecutar el comando: {e}")
+
+    # subprocess.run(["cryptsetup", "-y", "-v", "luksFormat", "--type", "luks2", "--force-password", f"/dev/{root_partition}"], input=f"YES\n{luks_pass}\n{luks_pass}", text=True, check=True )
+    subprocess.run(["cryptsetup", "luksOpen", f"/dev/{root_partition}","root"], input=luks_pass, text=True, check=True)
     root_partition = "/dev/mapper/root"
 
 def btrfs_partitioning(stdscr):
