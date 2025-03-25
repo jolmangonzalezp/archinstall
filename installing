@@ -106,44 +106,44 @@ function disk_formating() {
 function encripting() {
     set -e  # Detener la ejecución si ocurre un error
     echo "Encriptando el disco"
-
+    
     # Verificar que root_partition esté definido globalmente
     if [[ -z "$root_partition" ]]; then
         echo "Error: La variable global root_partition no está definida."
         return 1
     fi
-
+    
     # Verificar si la partición existe
     if [[ ! -e /dev/"$root_partition" ]]; then
         echo "Error: El dispositivo /dev/$root_partition no existe."
         return 1
     fi
-
+    
     # Solicitar contraseña LUKS
-    read -s -p "Introduce la contraseña LUKS: " luks_pass
-    echo
-    read -s -p "Confirma la contraseña LUKS: " luks_pass_confirm
-    echo
+    # read -s -p "Introduce la contraseña LUKS: " luks_pass
+    # echo
+    # read -s -p "Confirma la contraseña LUKS: " luks_pass_confirm
+    # echo
     if [[ "$luks_pass" != "$luks_pass_confirm" ]]; then
         echo "Error: Las contraseñas no coinciden."
         return 1
     fi
-
+    
     # Verificar si la partición está montada y desmontarla si es necesario
     if mount | grep -q "/dev/$root_partition"; then
         echo "El dispositivo /dev/$root_partition está montado. Desmontando..."
         umount "/dev/$root_partition"
     fi
-
+    
     # Limpiar la partición si ya tiene datos o configuraciones previas
     echo "Limpiando el disco..."
     cryptsetup erase "/dev/$root_partition" || echo "Advertencia: No se pudo limpiar el disco. Verifica permisos."
-
+    
     # Formatear y abrir la partición con LUKS
     echo "Configurando LUKS en el disco..."
-    echo -n "$luks_pass" | cryptsetup -y -v luksFormat --type luks2 --force-password /dev/"$root_partition" --key-file -
+    cryptsetup -y -v luksFormat --type luks2 --force-password /dev/"$root_partition" --key-file -
     cryptsetup open /dev/"$root_partition" cryptroot
-
+    
     # Verificar si crypy_root está definido globalmente
     if [[ -n "$crypy_root" ]]; then
         echo "Se usará la carpeta $crypy_root para montar la partición."
@@ -151,7 +151,7 @@ function encripting() {
         echo "Advertencia: La variable crypy_root no está definida globalmente. Continuando sin montar."
     fi
     btrfs_partition
-
+    
     echo "Encriptación completada exitosamente."
 }
 
