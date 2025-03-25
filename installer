@@ -127,7 +127,7 @@ function encripting() {
     
     # Limpiar la partición si ya tiene datos o configuraciones previas
     echo "Limpiando el disco..."
-    cryptsetup erase "/dev/$root_partition" || echo "Advertencia: No se pudo limpiar el disco. Verifica permisos."
+    cryptsetup close cryptroot || echo "Advertencia: No se pudo limpiar el disco. Verifica permisos."
     
     # Formatear y abrir la partición con LUKS
     echo "Configurando LUKS en el disco..."
