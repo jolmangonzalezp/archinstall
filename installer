@@ -169,23 +169,30 @@ function mount_partitions() {
     swap
 }
 
-function swap () {
+function swap() {
     swap_size=""
     size=$(awk '/MemTotal/ {print $2 / 1048576}' /proc/meminfo)
-    
+
     if (( $(echo "$size > 8" | bc -l) )); then
         swap_size=$(echo "$size / 2" | bc)
-        elif (( $(echo "$size <= 8" | bc -l) && $(echo "$size > 2" | bc -l) )); then
-        swap_size=$size 
+    elif (( $(echo "$size <= 8" | bc -l) && $(echo "$size > 2" | bc -l) )); then
+        swap_size=$size
     else
         swap_size=$(echo "$size * 2" | bc)
     fi
-    cd /mnt/swap
-    btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
-    swapon ./swapfile
-    cd
+    swap_size=$(printf "%.0fG" $swap_size)
+    if [ -d /mnt/swap ]; then
+        cd /mnt/swap || exit 1
+        btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
+        swapon ./swapfile
+        cd || exit 1
+    else
+        echo "Error: El directorio /mnt/swap no existe."
+        return 1
+    fi
     instalar_sistema
 }
+
 
 function instalar_sistema() {
     cpu_brand=$(lscpu | grep "Model name" | awk '{print $3}')
