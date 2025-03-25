@@ -28,7 +28,7 @@ def main(stdscr):
     set_locale(stdscr, root="")
     stdscr.refresh()    
 
-    menu = ['Particionar el disco', 'Formatear', 'Encriptar', 'Particionar BTRFS', 'Montar particiones', 'Salir']
+    menu = ['Particionar el disco', 'Formatear', 'Encriptar', 'Particionar BTRFS', 'Montar particiones', 'Memoria de intercambio', 'Install el sistema', 'Salir']
     current_row = 0
     
     while True:
@@ -72,6 +72,16 @@ def main(stdscr):
             elif menu[current_row] == 'Montar particiones':
                 stdscr.clear()
                 mount_partitions()
+                stdscr.refresh()
+                stdscr.getch()
+            elif menu[current_row] == 'Memoria de intercambio':
+                stdscr.clear()
+                swap(stdscr)
+                stdscr.refresh()
+                stdscr.getch()
+            elif menu[current_row] == 'Install el sistema':
+                stdscr.clear()
+                install(stdscr)
                 stdscr.refresh()
                 stdscr.getch()
             else:
@@ -262,8 +272,71 @@ def mount_partitions():
     subprocess.run(["mount", f"/dev/{efi}", "/mnt/boot"], check=True)
     print("Particiones montadas.")
 
+def swap(stdscr):
+    global root_partition
+    swap_size = ""
+    size = subprocess.run(
+        ["awk", "/MemTotal/ {print $2/1024}", "/proc/meminfo"], 
+        capture_output=True, 
+        text=True
+    ).stdout.strip()
+    size = float(size)
+    if size > 8192:
+        swap_size = (size/2)*1024
+    elif size <= 8192 and size > 2048:
+        swap_size = size*1024
+    else:
+        swap_size = size*2
+
+    subprocess.run(
+        ["btrfs", "filesystem", "mkswapfile", "--size", f"{swap_size}M", "--uuid", "clear", "./swapfile"],
+        check=True
+    )
+    message(stdscr , f"Archivo de swap creado con tamaño {swap_size} MB.")
+    subprocess.run(["swapon", "./swapfile"], check=True)
+
+def install(stdscr):
+    cpu_brand = ""
+    result = subprocess.run(
+        ["lscpu"], capture_output=True, text=True, check=True
+    )
+    # Filtrar la línea con "Vendor ID:" y extraer la tercera columna
+    for line in result.stdout.splitlines():
+        if "Vendor ID:" in line:
+            cpu_brand = line.split()[2]
+    packages = []
+    if cpu_brand == "AuthenticAMD":
+        packages = [
+        "base", "base-devel", "linux-zen", "linux-zen-headers", "linux-firmware", "btrfs-progs", "efibootmgr", "grub", "grub-btrfs", "os-prober", "networkmanager", "openssh", "sudo","dhcpcd", "zsh", "zsh-completions", "vim", "git", "curl", "wget", "man-db", "man-pages", "dosfstools", "e2fsprogs", "exfat-utils", "ntfs-3g", "smartmontools", "dialog", "man-db", "man-pages", "texinfo", "pacman-contrib", "snapper", "xdg-user-dirs", "xdg-utils", "tlp", "reflector", "neofetch", "amd-ucode", "inotify-tools", "pipewire", "pipewire-alsa", "pipewire-pulse", "pipewire-jack", "zsh-autosuggestions", "zsh-syntax-highlighting", "net-tools", "ifplugd", "iw", "wireless_tools", "wpa_supplicant", "dialog", "wireless-regdb", "bluez", "bluez-alsa", "bluez-cups", "bluez-firmware", "bluez-utils"
+        ]
+    elif cpu_brand == "GenuineIntel":
+        packages = [
+        "base", "base-devel", "linux-zen", "linux-zen-headers", "linux-firmware", "btrfs-progs", "efibootmgr", "grub", "grub-btrfs", "os-prober", "networkmanager", "openssh", "sudo","dhcpcd", "zsh", "zsh-completions", "vim", "git", "curl", "wget", "man-db", "man-pages", "dosfstools", "e2fsprogs", "exfat-utils", "ntfs-3g", "smartmontools", "dialog", "man-db", "man-pages", "texinfo", "pacman-contrib", "snapper", "xdg-user-dirs", "xdg-utils", "tlp", "reflector", "neofetch", "intel-ucode", "inotify-tools", "pipewire", "pipewire-alsa", "pipewire-pulse", "pipewire-jack", "zsh-autosuggestions", "zsh-syntax-highlighting", "net-tools", "ifplugd", "iw", "wireless_tools", "wpa_supplicant", "dialog", "wireless-regdb", "bluez", "bluez-alsa", "bluez-cups", "bluez-firmware", "bluez-utils"
+        ]
+    else:
+        packages = [
+        "base", "base-devel", "linux-zen", "linux-zen-headers", "linux-firmware", "btrfs-progs", "efibootmgr", "grub", "grub-btrfs", "os-prober", "networkmanager", "openssh", "sudo","dhcpcd", "zsh", "zsh-completions", "vim", "git", "curl", "wget", "man-db", "man-pages", "dosfstools", "e2fsprogs", "exfat-utils", "ntfs-3g", "smartmontools", "dialog", "man-db", "man-pages", "texinfo", "pacman-contrib", "snapper", "xdg-user-dirs", "xdg-utils", "tlp", "reflector", "neofetch", "amd-ucode", "intel-ucode", "inotify-tools", "pipewire", "pipewire-alsa", "pipewire-pulse", "pipewire-jack", "zsh-autosuggestions", "zsh-syntax-highlighting", "net-tools", "ifplugd", "iw", "wireless_tools", "wpa_supplicant", "dialog", "wireless-regdb", "bluez", "bluez-alsa", "bluez-cups", "bluez-firmware", "bluez-utils"
+        ]
+
+    try:
+        subprocess.run(
+            ["pacstrap", "/mnt"] + packages,
+            check=True
+        )
+        message(stdscr, "Sistema base instalado correctamente.")
+    except subprocess.CalledProcessError as e:
+        message(stdscr, f"Error al ejecutar pacstrap: {e}")
+    except Exception as e:
+        message(stdscr, f"Error inesperado: {e}")
+    
+   
     
 
 curses.wrapper(main)
 
-# subprocess.run(["pacman", "-S", "--noconfirm", "linux-zen-headers", "linux-zen", "btrfs-progs", "efibootmgr", "grub", "os-prober", "networkmanager", "openssh", "sudo", "dhcpcd", "base-devel", "zsh", "zsh-completions", "vim", "git", "curl", "wget", "man-db", "man-pages", "dosfstools", "e2fsprogs", "exfat-utils", "ntfs-3g", "smartmontools", "dialog", "man-db", "man-pages", "texinfo", "pacman-contrib", "snapper", "xdg-user-dirs", "xdg-utils", "tlp", "reflector", "neofetch", "amd-ucode"], check=True)
+
+# subprocess.run(["systemctl", "enable", "systemd-networkd"], check=True)
+#     subprocess.run(["systemctl", "enable", "systemd-timesyncd"], check=True)
+#     subprocess.run(["systemctl", "enable", "systemd-resolved"], check=True)
+#     subprocess.run(["systemctl", "enable", "NetworkManager"], check=True)
+#     subprocess.run(["systemctl", "enable", "sshd"], check=True)
