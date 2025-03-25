@@ -69,27 +69,28 @@ function particion_disco() {
     read -p "Selecciona el disco a particionar: " disk_name
     disk_size = $(echo "$(( $(cat /sys/class/block/${disk_name}/size) * 512 / 1024 / 1024 ))")
     root = $(echo "$(( $disk_size - 512 ) - size_swap ))")
-    
+    echo $root
     (
         echo "g";
         echo "n";
-        echo "";
+        echo "1";
         echo "";
         echo "+512M";
         echo "t"
         echo "1";
         echo "n";
-        echo "";
+        echo "2";
         echo "";
         echo "+${root}M";
         echo "n";
-        echo "";
+        echo "3";
         echo "";
         echo "";
         echo "t"
         echo "19";
         echo "w";
     ) | fdisk "/dev/$disk_name"
+     sleep 5
     clear
     echo "Particiones creadas:"
     lsblk "/dev/$disk_name"
