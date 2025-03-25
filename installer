@@ -6,7 +6,8 @@ root_partition=""
 locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
 timezone=$(curl -s https://ipapi.co/timezone | tr ',' '\n' | head -n 1)
 hostname=$(hostnamectl | grep "Hardware Model" | awk -F': ' '{gsub(/ /, "_", $2); print $2}')
-swapfile=""
+swap_size=""
+swap_partition=""
 
 function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
@@ -66,23 +67,33 @@ function particion_disco() {
     echo "Discos disponibles:"
     echo "$disks"
     read -p "Selecciona el disco a particionar: " disk_name
+    disk_size = $(echo "$(( $(cat /sys/class/block/${disk_name}/size) * 512 / 1024 / 1024 ))")
+    root = $(echo "$(( $disk_size - 512 ) - size_swap ))")
+    
     (
         echo "g";
         echo "n";
-        echo "1";
+        echo "";
         echo "";
         echo "+512M";
         echo "t"
         echo "1";
         echo "n";
-        echo "2";
         echo "";
         echo "";
+        echo "+${root}M";
+        echo "n";
+        echo "";
+        echo "";
+        echo "";
+        echo "t"
+        echo "19";
         echo "w";
     ) | fdisk "/dev/$disk_name"
     clear
     echo "Particiones creadas:"
     lsblk "/dev/$disk_name"
+    sleep 5
     disk_formating "$disk_name"
 }
 
@@ -94,16 +105,18 @@ function disk_formating() {
     if [[ "$interface" == "sata" ]]; then
         efi="${disk_name}1"
         root_partition="${disk_name}2"
-        mkfs.fat -F32 "/dev/${efi}"
-        encripting "$root_partition"
+        swap_partition="${disk_name}3"
         elif [[ "$interface" == "nvme" ]]; then
         efi="${disk_name}p1"
         root_partition="${disk_name}p2"
-        mkfs.fat -F32 "/dev/${efi}"
-        encripting
+        swap_partition="${disk_name}p3"
     else
         echo "No se pudo determinar la interfaz de $disk_name."
     fi
+    mkfs.fat -F32 "/dev/${efi}"
+    mkswap -f "$swap_partition"
+    swapom "$swap_partition"
+    encripting
 }
 
 function encripting() {
@@ -142,9 +155,7 @@ function encripting() {
     echo "Encriptación abierta exitosamente."
     
     btrfs_partition
-    
 }
-
 
 function btrfs_partition() {
     echo "Formating btrfs"
@@ -155,7 +166,6 @@ function btrfs_partition() {
     btrfs subvolume create @home
     btrfs subvolume create @snapshots
     btrfs subvolume create @var_log
-    btrfs subvolume create @swap
     cd
     mount_partitions
 }
@@ -163,18 +173,16 @@ function btrfs_partition() {
 function mount_partitions() {
     umount /mnt
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@ $root_partition /mnt
-    mkdir -p /mnt/{boot,home,.snapshots,var/log,swap}
+    mkdir -p /mnt/{boot,home,.snapshots,var/log}
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@home $root_partition /mnt/home
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots $root_partition /mnt/.snapshots
     mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log $root_partition /mnt/var/log
-    mount -o noatime,subvol=@swap $root_partition /mnt/swap
     mount /dev/${efi} /mnt/boot
-    swap
+    instalar_sistema
 }
 
 function swap() {
-    swap_size=""
-    size=$(awk '/MemTotal/ {print $2 / 1048576}' /proc/meminfo)
+    size=$(awk '/MemTotal/ {print $2 / 1024}' /proc/meminfo)
 
     if (( $(echo "$size > 8" | bc -l) )); then
         swap_size=$(echo "$size / 2" | bc)
@@ -183,19 +191,20 @@ function swap() {
     else
         swap_size=$(echo "$size * 2" | bc)
     fi
-    swap_size=$(printf "%.0fG" $swap_size)
-    if [ -d /mnt/swap ]; then
-        cd /mnt/swap || exit 1
-        btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
-        swapon ./swapfile
-        swapfile="/swap/swapfile"
-        chmod 600 /mnt/swap/swapfile
-        cd || exit 1
-    else
-        echo "Error: El directorio /mnt/swap no existe."
-        return 1
-    fi
-    instalar_sistema
+    
+    # if [ -d /mnt/swap ]; then
+    #     cd /mnt/swap || exit 1
+    #     btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
+    #     swapon ./swapfile
+    #     swapfile="/swap/swapfile"
+    #     chmod 600 /mnt/swap/swapfile
+    #     cd || exit 1
+
+    # else
+    #     echo "Error: El directorio /mnt/swap no existe."
+    #     return 1
+    # fi
+    
 }
 
 
