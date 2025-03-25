@@ -189,7 +189,7 @@ function swap() {
         btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
         swapon ./swapfile
         swapfile="/swap/swapfile"
-        chmod 600 /swap/swapfile
+        chmod 600 /mnt/swap/swapfile
         cd || exit 1
     else
         echo "Error: El directorio /mnt/swap no existe."
