@@ -128,15 +128,18 @@ function btrfs_setup() {
 
 function base_installation() {
     echo "Instalando el sistema base..."
-    packages = "base base-devel linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub grub-btrfs os-prober networkmanager openssh sudo dhcpcd zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch inotify-tools pipewire pipewire-alsa pipewire-pulse pipewire-jack zsh-autosuggestions zsh-syntax-highlighting net-tools ifplugd iw wireless_tools wpa_supplicant dialog wireless-regdb bluez bluez-alsa bluez-cups bluez-firmware bluez-utils"
+    packages="base base-devel linux-zen linux-zen-headers linux-firmware btrfs-progs efibootmgr grub grub-btrfs os-prober networkmanager openssh sudo dhcpcd zsh zsh-completions vim git curl wget man-db man-pages dosfstools e2fsprogs exfat-utils ntfs-3g smartmontools dialog man-db man-pages texinfo pacman-contrib snapper xdg-user-dirs xdg-utils tlp reflector neofetch inotify-tools pipewire pipewire-alsa pipewire-pulse pipewire-jack zsh-autosuggestions zsh-syntax-highlighting net-tools ifplugd iw wireless_tools wpa_supplicant dialog wireless-regdb bluez bluez-alsa bluez-cups bluez-firmware bluez-utils"
+
     if [[ $(lscpu | grep "Model name" | awk '{print $3}') == "AMD" ]]; then
         pacstrap -K /mnt $packages amd-ucode
     else
         pacstrap -K /mnt $packages intel-ucode
     fi
+
     forward
     generate_fstab
 }
+
 
 function generate_fstab() {
     echo "Generando fstab..."
