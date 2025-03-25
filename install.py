@@ -261,8 +261,7 @@ def encrypt_disk(stdscr):
     else:
         message(stdscr, f"Contraseña LUKS correcta. La constraseña LUKS es: {luks_pass}\n\tIniciando encriptación...")
 
-    subprocess.run(["cryptsetup", "-y", "-v", "luksFormat", "--type", "luks2", "--force-password", f"/dev/{root_partition}"],
-        input=input=f"YES\n{luks_pass}\n{luks_pass}",, text=True, check=True )
+    subprocess.run(["cryptsetup", "-y", "-v", "luksFormat", "--type", "luks2", "--force-password", f"/dev/{root_partition}"], input=f"YES\n{luks_pass}\n{luks_pass}", text=True, check=True )
     subprocess.run(["cryptsetup", "luksOpen", f"/dev/{root_partition}", "root"], input=luks_pass, text=True, check=True)
     root_partition = "/dev/mapper/root"
 
