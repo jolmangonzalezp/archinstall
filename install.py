@@ -251,7 +251,6 @@ def encrypt_disk(stdscr):
         subprocess.run(["cryptsetup", "erase", f"/dev/{root_partition}"], check=True)
     except subprocess.CalledProcessError as e:
         message(stdscr, f"No se pudo limpiar el disco. {e}")
-        return
     
     luks_pass = input("Introduce la contraseña LUKS: ")
     luks_pass_confirm = input("Confirma la contraseña LUKS: ")
