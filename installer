@@ -6,6 +6,7 @@ root_partition=""
 locale=$(curl -s https://ipapi.co/languages | tr ',' '\n' | head -n 1)
 timezone=$(curl -s https://ipapi.co/timezone | tr ',' '\n' | head -n 1)
 hostname=$(hostnamectl | grep "Hardware Model" | awk -F': ' '{gsub(/ /, "_", $2); print $2}')
+swapfile=""
 
 function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
@@ -14,7 +15,8 @@ function configurar_teclado_idioma() {
     export LANG=$locale.UTF-8
     clear
     echo "El teclado y el idioma se han configurado correctamente"
-    rfkill_unblock
+    
+    connect_to_internet
 }
 
 function rfkill_unblock() {
@@ -35,13 +37,13 @@ function rfkill_unblock() {
             echo "No se detectó un dispositivo con ID válido."
         fi
     done
-    connect_to_internet
 }
 
 function connect_to_internet() {
     if ping -c1 8.8.8.8 &>/dev/null; then
         echo "Conexión a Internet: OK"
     else
+        rfkill_unblock
         echo "No hay conexión a Internet"
         echo "Para conectarse a Internet, ejecuta: "
         echo "device list"
@@ -184,8 +186,9 @@ function swap() {
     swap_size=$(printf "%.0fG" $swap_size)
     if [ -d /mnt/swap ]; then
         cd /mnt/swap || exit 1
-        btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
-        swapon ./swapfile
+        btrfs filesystem mkswapfile --size $swap_size --uuid clear ./.swapfile
+        swapon ./.swapfile
+        swapfile="/swap/.swapfile"
         cd || exit 1
     else
         echo "Error: El directorio /mnt/swap no existe."
@@ -213,7 +216,7 @@ function configure_new_system() {
     arch-chroot /mnt hwclock --systohc --utc
     # echo $locale".UTF-8 UTF-8" >> /mnt/etc/locale.gen
     sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && 
-    arch-chroot /mnt export LANG=$locale.UTF-8 &&
+    # arch-chroot /mnt export LANG=$locale.UTF-8 &&
     arch-chroot /mnt locale-gen
     echo "KEYMAP=la-latin1" >> /etc/vconsole.conf
     echo "FONT=lat9w-16" >> /etc/vconsole.conf
@@ -247,13 +250,15 @@ function root_password() {
 }
 
 function grub () {
+    resume_offset=$(filefrag -v /swap/swapfile | awk '/ 1:/ {getline; print $4; exit}' | grep -o '^[0-9]*')
     sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
     sed -i "s/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems resume fsck)/" /mnt/etc/mkinitcpio.conf
-    arch-chroot /mnt mkinitcpio -P
     arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=ArchLinux --recheck
     uuid=$(blkid $root_partition | awk -F '"' '{print $2}')
-    sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot"|g' /mnt/etc/default/grub
-    sed -i 's/GRUB_DISABLE_OS_PROBER="true"/GRUB_DISABLE_OS_PROBER="false"/' /mnt/etc/default/grub
+    sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot resume='"${swapfile}"' resume_offset='"${resume_offset}"'"|g' /mnt/etc/default/grub
+
+    sed -i 's/#GRUB_DISABLE_OS_PROBER="false|"/GRUB_DISABLE_OS_PROBER="false"/' /mnt/etc/default/grub
+    arch-chroot /mnt mkinitcpio -P
     arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
     enable_services
 }
@@ -267,6 +272,7 @@ function enable_services() {
 }
 
 function umount_partitions() {
+    umount -l /mnt/swap
     umount -R /mnt
     # reboot
 }
