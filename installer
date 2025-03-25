@@ -11,6 +11,7 @@ function configurar_teclado_idioma() {
     echo "Configurando el teclado y el idioma"
     # echo $locale".UTF-8 UTF-8" >> /etc/locale.gen && locale-gen
     sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && locale-gen
+    export LANG=$locale.UTF-8
     clear
     echo "El teclado y el idioma se han configurado correctamente"
     rfkill_unblock
@@ -209,9 +210,14 @@ function configure_new_system() {
     clear
     echo "Configurando el sistema"
     ln -sf /usr/share/zoneinfo/$timezone /mnt/etc/localtime
-    hwclock --systohc --utc
+    arch-chroot /mnt hwclock --systohc --utc
     # echo $locale".UTF-8 UTF-8" >> /mnt/etc/locale.gen
-    sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && locale-gen
+    sed -i "s/#${locale}.UTF-8/${locale}.UTF-8/g" /mnt/etc/locale.gen && 
+    arch-chroot /mnt export LANG=$locale.UTF-8 &&
+    arch-chroot /mnt locale-gen
+    echo "KEYMAP=la-latin1" >> /etc/vconsole.conf
+    echo "FONT=lat9w-16" >> /etc/vconsole.conf
+    setfont lat9w-16
     echo $hostname  >> /mnt/etc/hostname
     echo "127.0.0.1    localhost" >> /mnt/etc/hosts
     echo "::1          localhost" >> /mnt/etc/hosts
@@ -226,7 +232,7 @@ function root_password() {
         echo "Confirma la contraseña:"
         read -s passwd_confirm
         if [ "$passwd" == "$passwd_confirm" ]; then
-            echo -e "${passwd}\n${passwd}" | passwd
+            echo -e "${passwd}\n${passwd}" | arch-chroot /mnt passwd
             if [ $? -eq 0 ]; then
                 echo "La contraseña de root ha sido configurada correctamente."
                 break
@@ -237,37 +243,32 @@ function root_password() {
             echo "Error: Las contraseñas no coinciden. Intenta de nuevo."
         fi
     done
+    grub
 }
 
 function grub () {
     sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
-    sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
-    # HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)
+    sed -i "s/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems resume fsck)/" /mnt/etc/mkinitcpio.conf
+    arch-chroot /mnt mkinitcpio -P
+    arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=ArchLinux --recheck
+    uuid=$(blkid $root_partition | awk -F '"' '{print $2}')
+    sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot"|g' /mnt/etc/default/grub
+    sed -i 's/GRUB_DISABLE_OS_PROBER="true"/GRUB_DISABLE_OS_PROBER="false"/' /mnt/etc/default/grub
+    arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+    enable_services
 }
 
-# function show_main_menu() {
-#     clear
-#     echo "===== Arch Linux Installer ====="
-#     echo
-#     echo "1. Particionar el disco"
-#     echo "2. Instalar el sistema base"
-#     echo "3. Configurar la red"
-#     echo "5. Crear usuario"
-#     echo "6. Configurar el sistema"
-#     echo "7. Salir"
-#     echo -n "Selecciona una opción: "
-#     read -r option
-#     case $option in
-#         1) particion_disco ;;
-#         2) instalar_sistema ;;
-#         3) configurar_red ;;
-#         4) crear_usuario ;;
-#         5) configurar_sistema ;;
-#         6) exit 0 ;;
-#         *) echo "Opción inválida. Presiona Enter para continuar." && read -r && show_main_menu ;;
-#     esac
-# }
+function enable_services() {
+    services=("systemd-networkd" "systemd-timesyncd" "systemd-resolved" "NetworkManager.service" "fstrim.timer" "sshd" "paccache.timer")
+    for service in "${services[@]}"; do
+        arch-chroot /mnt systemctl enable $service
+    done
+    umount_partitions
+}
 
+function umount_partitions() {
+    umount -R /mnt
+    reboot
+}
 
 configurar_teclado_idioma
-# connect_to_internet
