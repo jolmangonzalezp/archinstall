@@ -119,16 +119,6 @@ function encripting() {
         return 1
     fi
     
-    # Solicitar contraseña LUKS
-    # read -s -p "Introduce la contraseña LUKS: " luks_pass
-    # echo
-    # read -s -p "Confirma la contraseña LUKS: " luks_pass_confirm
-    # echo
-    if [[ "$luks_pass" != "$luks_pass_confirm" ]]; then
-        echo "Error: Las contraseñas no coinciden."
-        return 1
-    fi
-    
     # Verificar si la partición está montada y desmontarla si es necesario
     if mount | grep -q "/dev/$root_partition"; then
         echo "El dispositivo /dev/$root_partition está montado. Desmontando..."
@@ -142,17 +132,13 @@ function encripting() {
     # Formatear y abrir la partición con LUKS
     echo "Configurando LUKS en el disco..."
     cryptsetup -y -v luksFormat --type luks2 --force-password /dev/"$root_partition" --key-file -
+
+    echo "Encriptación completada exitosamente."
     cryptsetup open /dev/"$root_partition" cryptroot
+    echo "Encriptación abierta exitosamente."
     
-    # Verificar si crypy_root está definido globalmente
-    if [[ -n "$crypy_root" ]]; then
-        echo "Se usará la carpeta $crypy_root para montar la partición."
-    else
-        echo "Advertencia: La variable crypy_root no está definida globalmente. Continuando sin montar."
-    fi
     btrfs_partition
     
-    echo "Encriptación completada exitosamente."
 }
 
 
