@@ -132,7 +132,7 @@ function encripting() {
     # Formatear y abrir la partición con LUKS
     echo "Configurando LUKS en el disco..."
     cryptsetup -y -v luksFormat --type luks2 --force-password /dev/"$root_partition" --key-file -
-
+    
     echo "Encriptación completada exitosamente."
     cryptsetup open /dev/"$root_partition" cryptroot
     root_partition="/dev/mapper/cryptroot"
@@ -171,13 +171,14 @@ function mount_partitions() {
 
 function swap () {
     swap_size=""
-    size=$(awk '/MemTotal/ {print $2/1048576}' /proc/meminfo)
-    if [ $size -gt 8 ]; then
-        swap_size=$size/2
-        elif [ $size -le 8 && $size -gt 2 ]; then
-        swap_size=$size
+    size=$(awk '/MemTotal/ {print $2 / 1048576}' /proc/meminfo)
+    
+    if (( $(echo "$size > 8" | bc -l) )); then
+        swap_size=$(echo "$size / 2" | bc)
+        elif (( $(echo "$size <= 8" | bc -l) && $(echo "$size > 2" | bc -l) )); then
+        swap_size=$size 
     else
-        swap_size=$size*2
+        swap_size=$(echo "$size * 2" | bc)
     fi
     cd /mnt/swap
     btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
