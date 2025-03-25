@@ -268,7 +268,7 @@ function enable_services() {
 
 function umount_partitions() {
     umount -R /mnt
-    reboot
+    # reboot
 }
 
 configurar_teclado_idioma
