@@ -186,9 +186,10 @@ function swap() {
     swap_size=$(printf "%.0fG" $swap_size)
     if [ -d /mnt/swap ]; then
         cd /mnt/swap || exit 1
-        btrfs filesystem mkswapfile --size $swap_size --uuid clear ./.swapfile
-        swapon ./.swapfile
-        swapfile="/swap/.swapfile"
+        btrfs filesystem mkswapfile --size $swap_size --uuid clear ./swapfile
+        swapon ./swapfile
+        swapfile="/swap/swapfile"
+        chmod 600 /swap/swapfile
         cd || exit 1
     else
         echo "Error: El directorio /mnt/swap no existe."
@@ -250,14 +251,15 @@ function root_password() {
 }
 
 function grub () {
-    resume_offset=$(filefrag -v /swap/swapfile | awk '/ 1:/ {getline; print $4; exit}' | grep -o '^[0-9]*')
+    swapfile=$(findmnt -no UUID -T /swap/swapfile)
+    resume_offset=$(filefrag -v $swapfile | awk '/ 1:/ {getline; print $4; exit}' | grep -o '^[0-9]*')
     sed -i 's/MODULES=()/MODULES=(btrfs)/' /mnt/etc/mkinitcpio.conf
     sed -i "s/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems resume fsck)/" /mnt/etc/mkinitcpio.conf
     arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=ArchLinux --recheck
     uuid=$(blkid $root_partition | awk -F '"' '{print $2}')
-    sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot resume='"${swapfile}"' resume_offset='"${resume_offset}"'"|g' /mnt/etc/default/grub
+    sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot resume='"${swapfile}"' resume_offset='"${resume_offset}"' "|g' /mnt/etc/default/grub
 
-    sed -i 's/#GRUB_DISABLE_OS_PROBER="false|"/GRUB_DISABLE_OS_PROBER="false"/' /mnt/etc/default/grub
+    sed -i 's/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /mnt/etc/default/grub
     arch-chroot /mnt mkinitcpio -P
     arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
     enable_services
@@ -274,7 +276,7 @@ function enable_services() {
 function umount_partitions() {
     umount -l /mnt/swap
     umount -R /mnt
-    # reboot
+    reboot
 }
 
 configurar_teclado_idioma
