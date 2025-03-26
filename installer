@@ -1,11 +1,5 @@
 #!/bin/sh
 
-# /dev/sr0: BLOCK_SIZE="2048" UUID="2025-03-01-17-40-22-00" LABEL="ARCH_202503" TYPE="iso9660" PTUUID="6c692b18" PTTYPE="dos"
-# /dev/loop0: BLOCK_SIZE="1048576" TYPE="squashfs"
-# /dev/mapper/root: UUID="d1637397-1442-4f34-ad5d-149f21f7306b" UUID_SUB="50a55cfd-d5ae-4fab-9778-65dc8b0e30f7" BLOCK_SIZE="4096" TYPE="btrfs"
-# /dev/sda2: UUID="2f9d3eb5-16a1-461e-8d1d-739248f8dc9b" TYPE="crypto_LUKS" PARTUUID="a0f7fc6f-9ac7-42ba-ab46-d684815c504c"
-# /dev/sda1: UUID="A74C-1096" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="9770dab4-2456-4ea0-8b57-28e48726c21a"
-
 efi=""
 root_partition=""
 cript_partition=""
@@ -158,26 +152,25 @@ function generate_fstab() {
 
 function system_setup() {
     echo "Entrando al sistema para configuración final..."
-    arch-chroot /mnt <<EOF
-ln -sf /usr/share/zoneinfo/$timezone /etc/localtime
-hwclock --systohc
-echo "$locale.UTF-8 UTF-8" > /etc/locale.gen
-locale-gen
-echo "LANG=$locale.UTF-8" > /etc/locale.conf
-echo "KEYMAP=la-latin1" > /etc/vconsole.conf
-echo "$hostname" > /etc/hostname
-echo -e "127.0.0.1\tlocalhost\n::1\tlocalhost\n127.0.1.1\t$hostname.localdomain\t$hostname" > /etc/hosts
-passwd
-sed -i 's/MODULES=()/MODULES=(btrfs)/' /etc/mkinitcpio.conf
-sed -i "s/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems fsck)/" /etc/mkinitcpio.conf
-grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
-uuid=$(blkid $root_partition | awk -F '"' '{print $2}')
-sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root=/dev/mapper/cryptroot cryptdevice=UUID='"${uuid}"':cryptroot "|g' /etc/default/grub
-sed -i 's/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
-    mkinitcpio -P
-grub-mkconfig -o /boot/grub/grub.cfg
-exit
-EOF
+    arch-chroot /mnt ln -sf /usr/share/zoneinfo/$timezone /etc/localtime
+    arch-chroot /mnt hwclock --systohc
+    arch-chroot /mnt echo "$locale.UTF-8 UTF-8" > /etc/locale.gen
+    arch-chroot /mnt locale-gen
+    arch-chroot /mnt echo "LANG=$locale.UTF-8" > /etc/locale.conf
+    arch-chroot /mnt echo "KEYMAP=la-latin1" > /etc/vconsole.conf
+    arch-chroot /mnt echo "$hostname" > /etc/hostname
+    arch-chroot /mnt echo -e "127.0.0.1\tlocalhost\n::1\tlocalhost\n127.0.1.1\t$hostname.localdomain\t$hostname" > /etc/hosts
+    arch-chroot /mnt passwd
+    arch-chroot /mnt sed -i 's/MODULES=()/MODULES=(btrfs)/' /etc/mkinitcpio.conf
+    arch-chroot /mnt sed -i "s/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems fsck)/" /etc/mkinitcpio.conf
+    arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB 
+    uuid=$(blkid $root_partition | awk -F '"' '{print $2}')
+    # arch-chroot /mnt sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet root='"${crypt_partition}"' cryptdevice=UUID='"${uuid}"':'"$(basename $crypt_partition)"' "|g' /etc/default/grub
+    arch-chroot /mnt sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet cryptdevice=UUID='"${uuid}"':root root=/dev/mapper/root"|g' /etc/default/grub
+
+    arch-chroot /mnt sed -i 's/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
+    arch-chroot /mnt mkinitcpio -P
+    arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
     echo "Instalación completada."
     forward
     enable_services
