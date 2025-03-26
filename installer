@@ -1,7 +1,14 @@
 #!/bin/sh
 
+# /dev/sr0: BLOCK_SIZE="2048" UUID="2025-03-01-17-40-22-00" LABEL="ARCH_202503" TYPE="iso9660" PTUUID="6c692b18" PTTYPE="dos"
+# /dev/loop0: BLOCK_SIZE="1048576" TYPE="squashfs"
+# /dev/mapper/root: UUID="d1637397-1442-4f34-ad5d-149f21f7306b" UUID_SUB="50a55cfd-d5ae-4fab-9778-65dc8b0e30f7" BLOCK_SIZE="4096" TYPE="btrfs"
+# /dev/sda2: UUID="2f9d3eb5-16a1-461e-8d1d-739248f8dc9b" TYPE="crypto_LUKS" PARTUUID="a0f7fc6f-9ac7-42ba-ab46-d684815c504c"
+# /dev/sda1: UUID="A74C-1096" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="9770dab4-2456-4ea0-8b57-28e48726c21a"
+
 efi=""
 root_partition=""
+cript_partition=""
 swap_partition=""
 swap_size=""
 locale=""
@@ -99,16 +106,16 @@ function disk_formating() {
 function encryption() {
     echo "Configurando encriptación en la partición raíz..."
     cryptsetup luksFormat "$root_partition"
-    cryptsetup open "$root_partition" cryptroot
-    root_partition="/dev/mapper/cryptroot"
+    cryptsetup open "$root_partition" root
+    crypt_partition="/dev/mapper/root"
     forward
     btrfs_setup
 }
 
 function btrfs_setup() {
     echo "Formateando partición raíz como Btrfs..."
-    mkfs.btrfs "$root_partition"
-    mount "$root_partition" /mnt
+    mkfs.btrfs "$crypt_partition"
+    mount "$crypt_partition" /mnt
     btrfs subvolume create /mnt/@
     btrfs subvolume create /mnt/@home
     btrfs subvolume create /mnt/@snapshots
@@ -116,11 +123,11 @@ function btrfs_setup() {
     umount /mnt
     
     echo "Montando subvolúmenes..."
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ "$root_partition" /mnt
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@ "$crypt_partition" /mnt
     mkdir -p /mnt/{boot,home,.snapshots,var/log}
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home "$root_partition" /mnt/home
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots "$root_partition" /mnt/.snapshots
-    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log "$root_partition" /mnt/var/log
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@home "$crypt_partition" /mnt/home
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots "$crypt_partition" /mnt/.snapshots
+    mount -o noatime,compress=zstd,space_cache=v2,subvol=@var_log "$crypt_partition" /mnt/var/log
     mount "$efi" /mnt/boot
     forward
     base_installation
@@ -169,6 +176,7 @@ sed -i 's|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"|GRUB_CMDLINE_LINUX_DEFAU
 sed -i 's/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
     mkinitcpio -P
 grub-mkconfig -o /boot/grub/grub.cfg
+exit
 EOF
     echo "Instalación completada."
     forward
