@@ -1,0 +1,7 @@
+#!/bin/sh
+
+export DISPLAY=:0
+export XDG_RUNTIME_DIR=/run/user/1000
+export XAUTHORITY=/home/usuario/.Xauthority
+wlogout --protocol layer-shell -b 5
+

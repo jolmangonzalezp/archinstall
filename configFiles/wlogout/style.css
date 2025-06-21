@@ -1,0 +1,51 @@
+* {
+	background-image: none;
+}
+window {
+	background-color: rgba(51, 51, 51, 0.75);
+}
+button {
+    color: #fff;
+	font-size: 16px;
+	background-color: #333;
+	border-style: none;
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 35%;
+	border-radius: 60%;
+	margin: 192px 25px;
+	text-shadow: 0px 0px;
+	box-shadow: 5px 5px #1793d1;
+	transition: all 0.3s ease-in-out;
+}
+
+button:focus, button:active, button:hover {
+	background-color: #1793d1;
+	outline-style: none;
+	box-shadow: 5px 5px #333;
+	transition: all 0.3s ease-in-out;
+}
+
+#lock {
+    background-image: image(url("icons/lock.png"), url("/usr/local/share/wlogout/icons/lock.png"));
+}
+
+#logout {
+    background-image: image(url("icons/logout.png"), url("/usr/local/share/wlogout/icons/logout.png"));
+}
+
+#suspend {
+    background-image: image(url("icons/suspend.png"), url("/usr/local/share/wlogout/icons/suspend.png"));
+}
+
+#hibernate {
+    background-image: image(url("icons/hibernate.png"), url("/usr/local/share/wlogout/icons/hibernate.png"));
+}
+
+#shutdown {
+    background-image: image(url("icons/shutdown.png"), url("/usr/local/share/wlogout/icons/shutdown.png"));
+}
+
+#reboot {
+    background-image: image(url("icons/reboot.png"), url("/usr/local/share/wlogout/icons/reboot.png"));
+}

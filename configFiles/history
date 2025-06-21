@@ -1,0 +1,77 @@
+sudo pacman -S zsh-autocomplete zsh-autosuggestions zsh-syntax-highlighting
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
+sudo pacman-key --lsign-key 3056513887B78AEB
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+sudo pacman -Syyu
+sudo pacman -S visual-studio-code-bin
+sudo pacman -S nerd-fonts
+sudo pacman -S pipewire pipewire-pulse pipewire-alsa pipewire-jack pipewire-audio pipewire-session-manager wireplumber
+sudo systemctl --user enable --now pipewire
+sudo systemctl --user enable --now pipewire-pulse.service
+sudo pacman -S telegram-desktop
+sudo pacman -S intellij-idea-community-edition
+sudo pacman -S brightnessctl
+sudo pacman -S maim
+sudo pacman -S jdk-openjdk unzip wget cmake ninja
+sudo pacman -S qemu-full libvirt virt-manager
+sudo systemctl enable --now libvirtd
+sudo pacman -S libbsd
+sudo pacman -S pycharm-community-edition
+sudo pacman -S acpid
+sudo pacman -S alsa-firmware android-file-transfer android-tools bat blueman bluez-utils bridge-utils btop datagrip discord dropbox
+sudo pacman -S wget xf86-video-vesa zsh-theme-powerlevel10k-git gpart gwenview htop inkscape kate kcalc kcolorchooser libreoffice-fresh-es lsd lxrandr maim man-pages msmtp mypy mysql nano pfetch net-tools network-manager-applet nitrogen nmap okular
+git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+sudo pacman -S mysql
+sudo mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+sudo mysqld --initialize --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+sudo systemctl enable mysqld
+sudo systemctl start mysqld
+sudo mysql_secure_installation
+sudo mysql -u root -p
+git config --global user.email "jolmangonzalez5@gmail.com"
+git config --global user.name "Jolman Gonzalez"
+ssh-keygen -t ed25519 -C "jolmangonzalez5@gmail.com"
+sudo pacman -S openssh
+sudo pacman -S usbutils
+sudo pacman -S exfat-utils exfatprogssudo pacman -S gvfssudo pacman -S gvfs-{afc,dnssd,goa,google,gphoto2,mtp,nfs,smb,wsdd}
+sudo pacman -S picom
+yay -S xwaylandvideobridge
+sudo pacman -S waybar
+sudo pacman -S xorg-xwayland
+WAYLAND_DISPLAY=wayland-1 xwaylandvideobridge
+env XDG_SESSION_TYPE=x11 discord
+sudo pacman -S xf86-video-amdgpu
+sudo pacman -S ydotool
+sudo pacman -S xdg-utils
+sudo pacman -S xdg-desktop-portal xdg-desktop-portal-wlr
+sudo pacman -S xdg-desktop-portal-hyprland
+systemctl --user restart xdg-desktop-portal xdg-desktop-portal-hyprland
+sudo pacman -S waypaper
+sudo pacman -S ranger
+sudo pacman -S wlogout
+wlogout --protocol layer-shell
+sudo pacman -S pavucontrol
+sudo pacman -S ttf-meslo-nerd-font-powerlevel10k
+yay -S notion-app-electron
+yay -S spotify
+sudo pacman -S docker
+sudo pacman -S blueman
+sudo pacman -S bluez bluez-utils
+systemctl start bluetooth.service
+systemctl enable bluetooth.service
+sudo pacman -S nodejs-lts-jod
+sudo pacman -S grim
+sudo pacman -S --needed base-devel
+git clone https://aur.archlinux.org/paru.git && cd paru && makepkg -si
+sudo pacman -S cargo
+sudo pacman -S steam
+yay -S librewolf-bin
+sudo pacman -S neovim
+sudo pacman -S lightdm
+sudo pacman -S lightdm-slick-greeter
+sudo pacman -S ttf-fira-code
+yay -S nerd-fonts-fira-code
+sudo pacman -S nerd-fonts-fira-code
+sudo pacman -S unrar
+yay -S grub-customizer
